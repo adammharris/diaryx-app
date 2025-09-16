@@ -1,10 +1,9 @@
 import { component$, useSignal, useTask$ } from "@builder.io/qwik";
-import MarkdownIt from "markdown-it";
 import { stampNoteUpdated } from "../lib/diaryx/note-utils";
 import { CodeMirrorEditor } from "./codemirror-editor";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
+import { renderMarkdownToHtml } from "../lib/markdown/renderer";
 
-const md = new MarkdownIt({ html: true, linkify: true, typographer: true });
 
 export const NoteEditor = component$(() => {
   const session = useDiaryxSession();
@@ -16,12 +15,12 @@ export const NoteEditor = component$(() => {
     const activeId = track(() => session.activeNoteId);
     const note = session.notes.find((item) => item.id === activeId);
     markdownSignal.value = note?.body ?? "";
-    htmlSignal.value = note ? md.render(note.body) : "";
+    htmlSignal.value = note ? renderMarkdownToHtml(note.body) : "";
   });
 
   useTask$(({ track }) => {
     const text = track(() => markdownSignal.value);
-    htmlSignal.value = md.render(text);
+    htmlSignal.value = renderMarkdownToHtml(text);
   });
 
   useTask$(({ track }) => {
@@ -48,9 +47,9 @@ export const NoteEditor = component$(() => {
     );
   }
 
-  const showEditorPane = viewMode.value === "split" || viewMode.value === "source";
-  const showPreviewPane = viewMode.value === "split" || viewMode.value === "preview" || viewMode.value === "live";
   const isLivePreview = viewMode.value === "live";
+  const showEditorPane = viewMode.value !== "preview";
+  const showPreviewPane = viewMode.value === "split" || viewMode.value === "preview";
 
   return (
     <section class="note-editor" data-mode={viewMode.value}>
@@ -83,9 +82,10 @@ export const NoteEditor = component$(() => {
       </header>
       <div class="editor-panes">
         {showEditorPane && (
-          <div class={{ "editor-pane": true, hidden: isLivePreview }}>
+          <div class={{ "editor-pane": true, live: isLivePreview }}>
             <CodeMirrorEditor
               value={markdownSignal.value}
+              variant={isLivePreview ? "live" : "default"}
               onChange$={(next: string) => {
                 markdownSignal.value = next;
                 note.body = next;
@@ -98,8 +98,7 @@ export const NoteEditor = component$(() => {
           <div
             class={{
               "preview-pane": true,
-              readonly: viewMode.value === "preview" || viewMode.value === "live",
-              interactive: isLivePreview,
+              readonly: viewMode.value === "preview",
             }}
             dangerouslySetInnerHTML={htmlSignal.value}
           />
