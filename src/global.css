@@ -550,6 +550,64 @@ body {
   height: 100%;
 }
 
+.note-editor[data-mode="live"] .cm-header {
+  font-family: "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", system-ui,
+    sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  display: block;
+  text-decoration: none !important;
+  color: inherit;
+}
+
+.note-editor[data-mode="live"] .cm-header-1 {
+  font-size: 2.4rem;
+  line-height: 1.2;
+  margin-top: 2.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.note-editor[data-mode="live"] .cm-header-2 {
+  font-size: 1.9rem;
+  line-height: 1.25;
+  margin-top: 2.2rem;
+  margin-bottom: 1rem;
+}
+
+.note-editor[data-mode="live"] .cm-header-3 {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  margin-top: 1.8rem;
+  margin-bottom: 0.85rem;
+}
+
+.note-editor[data-mode="live"] .cm-header-4 {
+  font-size: 1.3rem;
+  line-height: 1.35;
+  margin-top: 1.5rem;
+  margin-bottom: 0.7rem;
+}
+
+.note-editor[data-mode="live"] .cm-header-5 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 1.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.note-editor[data-mode="live"] .cm-header-6 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 1.3rem;
+  margin-bottom: 0.6rem;
+}
+
+.note-editor[data-mode="live"] .cm-header::after {
+  content: "";
+}
+
 
 .editor-pane.live .cm-scroller {
   background: transparent;

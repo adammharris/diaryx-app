@@ -6,7 +6,11 @@ import {
 } from "@builder.io/qwik";
 import { EditorState, Compartment } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import {
+  HighlightStyle,
+  defaultHighlightStyle,
+  syntaxHighlighting,
+} from "@codemirror/language";
 import { history } from "@codemirror/commands";
 import {
   keymap,
@@ -18,6 +22,7 @@ import {
 } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { RangeSetBuilder } from "@codemirror/state";
+import { tags } from "@lezer/highlight";
 
 const themeCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
@@ -71,7 +76,7 @@ const livePreviewTheme = EditorView.theme(
     },
     ".cm-scroller": {
       fontFamily: PROSE_FONT_STACK,
-      lineHeight: "1.65",
+      lineHeight: "1.5",
       fontSize: "1.05rem",
       paddingBottom: "4rem",
     },
@@ -80,36 +85,60 @@ const livePreviewTheme = EditorView.theme(
       maxWidth: "72ch",
     },
     ".cm-line": {
-      padding: "0.35rem 0",
+      padding: "0.18rem 0",
       position: "relative",
     },
     "&.cm-focused .cm-cursor": {
       borderLeft: "2px solid var(--text-primary)",
     },
-    ".cm-heading": {
-      fontWeight: "600",
-      letterSpacing: "-0.01em",
+    ".cm-header, .cm-heading": {
+      fontFamily: PROSE_FONT_STACK,
+      fontWeight: "700",
+      letterSpacing: "-0.015em",
       display: "block",
+      textDecoration: "none",
+      color: "inherit",
     },
-    ".cm-heading.cm-heading1": {
-      fontSize: "2rem",
-      marginTop: "2.4rem",
-      marginBottom: "1.1rem",
+    ".cm-header *, .cm-heading *": {
+      textDecoration: "none",
     },
-    ".cm-heading.cm-heading2": {
-      fontSize: "1.6rem",
-      marginTop: "2rem",
+    ".cm-header.cm-header-1, .cm-heading.cm-heading1": {
+      fontSize: "2.4rem",
+      lineHeight: "1.2",
+      marginTop: "2.6rem",
+      marginBottom: "1.25rem",
+    },
+    ".cm-header.cm-header-2, .cm-heading.cm-heading2": {
+      fontSize: "1.9rem",
+      lineHeight: "1.25",
+      marginTop: "2.2rem",
       marginBottom: "1rem",
     },
-    ".cm-heading.cm-heading3": {
-      fontSize: "1.35rem",
-      marginTop: "1.6rem",
-      marginBottom: "0.9rem",
+    ".cm-header.cm-header-3, .cm-heading.cm-heading3": {
+      fontSize: "1.5rem",
+      lineHeight: "1.3",
+      marginTop: "1.8rem",
+      marginBottom: "0.85rem",
     },
-    ".cm-heading.cm-heading4": {
+    ".cm-header.cm-header-4, .cm-heading.cm-heading4": {
+      fontSize: "1.3rem",
+      lineHeight: "1.35",
+      marginTop: "1.5rem",
+      marginBottom: "0.7rem",
+    },
+    ".cm-header.cm-header-5, .cm-heading.cm-heading5": {
       fontSize: "1.2rem",
+      fontWeight: "600",
       marginTop: "1.4rem",
-      marginBottom: "0.8rem",
+      marginBottom: "0.6rem",
+    },
+    ".cm-header.cm-header-6, .cm-heading.cm-heading6": {
+      fontSize: "1.1rem",
+      fontWeight: "600",
+      marginTop: "1.3rem",
+      marginBottom: "0.6rem",
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
     },
     ".cm-strong": {
       fontWeight: "600",
@@ -174,6 +203,25 @@ const livePreviewTheme = EditorView.theme(
 );
 
 const hiddenMarkerDecoration = Decoration.replace({});
+
+const headingLineDecorations = Array.from({ length: 6 }, (_, index) =>
+  Decoration.line({ class: `cm-header cm-header-${index + 1}` })
+);
+
+const livePreviewHighlightStyle = HighlightStyle.define([
+  {
+    tag: [
+      tags.heading,
+      tags.heading1,
+      tags.heading2,
+      tags.heading3,
+      tags.heading4,
+      tags.heading5,
+      tags.heading6,
+    ],
+    textDecoration: "none",
+  },
+]);
 
 const inlineMarkerRegex = /(`{1,3}|\*\*|__|~~|\*|_)/g;
 
@@ -252,19 +300,16 @@ const hideMarkdownMarkersPlugin = ViewPlugin.fromClass(
       for (const { from, to } of visible) {
         let line = doc.lineAt(from);
         while (line.from <= to) {
+          const text = line.text;
+          const base = line.from;
+
+          const headingMatch = /^\s{0,3}(#{1,6})(?=\s)/.exec(text);
+          if (headingMatch) {
+            const level = Math.min(headingMatch[1].length, 6);
+            builder.add(base, base, headingLineDecorations[level - 1]);
+          }
+
           if (!activeLines.has(line.number)) {
-            const text = line.text;
-            const base = line.from;
-
-            const headingMatch = /^\s{0,3}(#{1,6})(?=\s)/.exec(text);
-            if (headingMatch) {
-              builder.add(
-                base + headingMatch.index,
-                base + headingMatch.index + headingMatch[1].length,
-                hiddenMarkerDecoration
-              );
-            }
-
             const blockquoteMatch = /^\s{0,3}(>\s?)/.exec(text);
             if (blockquoteMatch) {
               builder.add(
@@ -316,6 +361,14 @@ const hideMarkdownMarkersPlugin = ViewPlugin.fromClass(
               builder.add(
                 base + frontMatterMatch.index,
                 base + frontMatterMatch.index + frontMatterMatch[1].length,
+                hiddenMarkerDecoration
+              );
+            }
+
+            if (headingMatch) {
+              builder.add(
+                base + headingMatch.index,
+                base + headingMatch.index + headingMatch[1].length,
                 hiddenMarkerDecoration
               );
             }
@@ -410,7 +463,10 @@ export const CodeMirrorEditor = component$(
         view.dispatch({
           effects: [
             themeCompartment.reconfigure(livePreviewTheme),
-            presentationCompartment.reconfigure(hideMarkdownMarkersPlugin),
+            presentationCompartment.reconfigure([
+              hideMarkdownMarkersPlugin,
+              syntaxHighlighting(livePreviewHighlightStyle),
+            ]),
           ],
         });
       }
@@ -450,7 +506,12 @@ export const CodeMirrorEditor = component$(
             mode === "live" ? livePreviewTheme : defaultTheme
           ),
           presentationCompartment.reconfigure(
-            mode === "live" ? hideMarkdownMarkersPlugin : []
+            mode === "live"
+              ? [
+                  hideMarkdownMarkersPlugin,
+                  syntaxHighlighting(livePreviewHighlightStyle),
+                ]
+              : []
           ),
         ],
       });
