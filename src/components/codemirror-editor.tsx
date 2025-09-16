@@ -304,9 +304,17 @@ const hideMarkdownMarkersPlugin = ViewPlugin.fromClass(
           const base = line.from;
 
           const headingMatch = /^\s{0,3}(#{1,6})(?=\s)/.exec(text);
+          let headingWhitespaceLength = 0;
           if (headingMatch) {
             const level = Math.min(headingMatch[1].length, 6);
             builder.add(base, base, headingLineDecorations[level - 1]);
+            const afterHashes = text.slice(
+              headingMatch.index + headingMatch[1].length
+            );
+            const whitespaceMatch = /^(\s+)/.exec(afterHashes);
+            if (whitespaceMatch) {
+              headingWhitespaceLength = whitespaceMatch[1].length;
+            }
           }
 
           if (!activeLines.has(line.number)) {
@@ -371,6 +379,16 @@ const hideMarkdownMarkersPlugin = ViewPlugin.fromClass(
                 base + headingMatch.index + headingMatch[1].length,
                 hiddenMarkerDecoration
               );
+              if (headingWhitespaceLength > 0) {
+                builder.add(
+                  base + headingMatch.index + headingMatch[1].length,
+                  base +
+                    headingMatch.index +
+                    headingMatch[1].length +
+                    headingWhitespaceLength,
+                  hiddenMarkerDecoration
+                );
+              }
             }
 
             inlineMarkerRegex.lastIndex = 0;
