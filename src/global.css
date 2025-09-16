@@ -548,18 +548,14 @@ body {
 .editor-pane.live .cm-scroller {
   background: transparent;
 }
-
-.live-overlay h1,
-.live-overlay h2,
-.live-overlay h3,
-.live-overlay h4,
-.live-overlay h5,
-.live-overlay h6 {
-  margin-top: 1.4rem;
-  margin-bottom: 0.6rem;
-  font-weight: 600;
+.cm-markdownMarker {
+  opacity: 0;
+  color: transparent;
+  transition: opacity 120ms ease;
 }
 
-.live-overlay p {
-  margin: 0.6rem 0;
+.cm-activeLine .cm-markdownMarker,
+.cm-focused .cm-activeLine .cm-markdownMarker {
+  opacity: 1;
+  color: inherit;
 }

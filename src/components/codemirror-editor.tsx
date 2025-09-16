@@ -8,11 +8,19 @@ import { EditorState, Compartment } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { history } from "@codemirror/commands";
-import { keymap, EditorView } from "@codemirror/view";
+import {
+  keymap,
+  EditorView,
+  ViewPlugin,
+  Decoration,
+  DecorationSet,
+} from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
+import { RangeSetBuilder } from "@codemirror/state";
 
 const themeCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
+const presentationCompartment = new Compartment();
 
 const CODE_FONT_STACK =
   'SFMono-Regular, "JetBrains Mono", ui-monospace, SFMono-Regular, monospace';
@@ -25,6 +33,7 @@ const baseExtensions = [
   markdown({ base: markdownLanguage }),
   syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
   EditorState.allowMultipleSelections.of(true),
+  presentationCompartment.of([]),
 ];
 
 const defaultTheme = EditorView.theme(
@@ -63,12 +72,15 @@ const livePreviewTheme = EditorView.theme(
       fontFamily: PROSE_FONT_STACK,
       lineHeight: "1.65",
       fontSize: "1.05rem",
+      paddingBottom: "4rem",
     },
     ".cm-content": {
       padding: "1.5rem 2rem",
+      maxWidth: "72ch",
     },
     ".cm-line": {
-      padding: "0.2rem 0",
+      padding: "0.35rem 0",
+      position: "relative",
     },
     "&.cm-focused .cm-cursor": {
       borderLeft: "2px solid var(--text-primary)",
@@ -76,18 +88,27 @@ const livePreviewTheme = EditorView.theme(
     ".cm-heading": {
       fontWeight: "600",
       letterSpacing: "-0.01em",
+      display: "block",
     },
     ".cm-heading.cm-heading1": {
-      fontSize: "1.6rem",
-      marginTop: "1.6rem",
+      fontSize: "2rem",
+      marginTop: "2.4rem",
+      marginBottom: "1.1rem",
     },
     ".cm-heading.cm-heading2": {
-      fontSize: "1.35rem",
-      marginTop: "1.4rem",
+      fontSize: "1.6rem",
+      marginTop: "2rem",
+      marginBottom: "1rem",
     },
     ".cm-heading.cm-heading3": {
+      fontSize: "1.35rem",
+      marginTop: "1.6rem",
+      marginBottom: "0.9rem",
+    },
+    ".cm-heading.cm-heading4": {
       fontSize: "1.2rem",
-      marginTop: "1.2rem",
+      marginTop: "1.4rem",
+      marginBottom: "0.8rem",
     },
     ".cm-strong": {
       fontWeight: "600",
@@ -96,15 +117,160 @@ const livePreviewTheme = EditorView.theme(
       fontStyle: "italic",
     },
     ".cm-quote": {
-      borderLeft: "3px solid rgba(148, 163, 184, 0.45)",
-      paddingLeft: "0.75rem",
+      borderLeft: "4px solid rgba(148, 163, 184, 0.45)",
+      paddingLeft: "0.85rem",
       fontStyle: "italic",
+      color: "rgba(71, 85, 105, 0.95)",
     },
     ".cm-list": {
-      paddingLeft: "0.75rem",
+      paddingLeft: "1.5rem",
+    },
+    ".cm-list .cm-line::marker": {
+      color: "rgba(71, 85, 105, 0.8)",
+    },
+    ".cm-listBullet::before": {
+      content: '"•"',
+      marginRight: "0.75rem",
+    },
+    ".cm-taskMarker": {
+      marginRight: "0.75rem",
+    },
+    ".cm-codeBlock": {
+      fontFamily: CODE_FONT_STACK,
+      borderRadius: "14px",
+      background: "rgba(15, 23, 42, 0.08)",
+      padding: "1rem 1.25rem",
+      boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.05)",
+    },
+    ".cm-inlineCode": {
+      fontFamily: CODE_FONT_STACK,
+      background: "rgba(148, 163, 184, 0.2)",
+      padding: "0.2rem 0.4rem",
+      borderRadius: "8px",
+      fontSize: "0.95rem",
+    },
+    ".cm-hr": {
+      border: "none",
+      borderTop: "1px solid rgba(148, 163, 184, 0.5)",
+      margin: "2rem 0",
+    },
+    ".cm-frontmatter": {
+      fontFamily: CODE_FONT_STACK,
+      background: "rgba(15, 23, 42, 0.05)",
+      padding: "1rem 1.25rem",
+      borderRadius: "16px",
+      marginBottom: "1.5rem",
+    },
+    ".cm-markdownMarker": {
+      opacity: 0,
+      transition: "opacity 120ms ease",
+    },
+    ".cm-activeLine .cm-markdownMarker": {
+      opacity: 1,
     },
   },
   { dark: false }
+);
+
+const hiddenMarkerDecoration = Decoration.mark({ class: "cm-markdownMarker" });
+
+const inlineMarkerRegex = /(```|~~~|\*\*|__|~~|`|\*|_)/g;
+
+const hideMarkdownMarkersPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.buildDecorations(view);
+    }
+
+    update(update: { view: EditorView; docChanged: boolean; selectionSet: boolean; viewportChanged: boolean }) {
+      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+        this.decorations = this.buildDecorations(update.view);
+      }
+    }
+
+    buildDecorations(view: EditorView) {
+      const builder = new RangeSetBuilder<Decoration>();
+      const doc = view.state.doc;
+      const activeLines = new Set<number>();
+
+      for (const range of view.state.selection.ranges) {
+        const fromLine = doc.lineAt(range.from).number;
+        const toLine = doc.lineAt(range.to).number;
+        for (let line = fromLine; line <= toLine; line++) {
+          activeLines.add(line);
+        }
+      }
+
+      const visible = view.visibleRanges;
+
+      for (const { from, to } of visible) {
+        let line = doc.lineAt(from);
+        while (line.from <= to) {
+          if (!activeLines.has(line.number)) {
+            const text = line.text;
+            const base = line.from;
+
+            const headingMatch = /^\s{0,3}(#{1,6})(?=\s)/.exec(text);
+            if (headingMatch) {
+              builder.add(base + headingMatch.index, base + headingMatch.index + headingMatch[1].length, hiddenMarkerDecoration);
+            }
+
+            const blockquoteMatch = /^\s{0,3}(>\s?)/.exec(text);
+            if (blockquoteMatch) {
+              builder.add(base + blockquoteMatch.index, base + blockquoteMatch.index + blockquoteMatch[1].length, hiddenMarkerDecoration);
+            }
+
+            const taskMatch = /^\s{0,3}[*+-]\s+(\[[xX\s]\])/.exec(text);
+            if (taskMatch) {
+              const markerStart = text.indexOf(taskMatch[1]);
+              builder.add(base + markerStart, base + markerStart + taskMatch[1].length, hiddenMarkerDecoration);
+            }
+
+            const orderedMatch = /^\s{0,3}(\d+[.)])\s+/.exec(text);
+            if (orderedMatch) {
+              builder.add(base + orderedMatch.index, base + orderedMatch.index + orderedMatch[1].length, hiddenMarkerDecoration);
+            }
+
+            const bulletMatch = /^\s{0,3}([*+-])\s+/.exec(text);
+            if (bulletMatch) {
+              builder.add(base + bulletMatch.index, base + bulletMatch.index + bulletMatch[1].length, hiddenMarkerDecoration);
+            }
+
+            const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(text);
+            if (fenceMatch) {
+              builder.add(
+                base + fenceMatch.index,
+                base + fenceMatch.index + fenceMatch[1].length,
+                hiddenMarkerDecoration
+              );
+            }
+
+            const frontMatterMatch = /^\s{0,3}(---|\+\+\+)(\s.*)?$/.exec(text);
+            if (frontMatterMatch) {
+              builder.add(base + frontMatterMatch.index, base + frontMatterMatch.index + frontMatterMatch[1].length, hiddenMarkerDecoration);
+            }
+
+            inlineMarkerRegex.lastIndex = 0;
+            let match;
+            while ((match = inlineMarkerRegex.exec(text)) !== null) {
+              const fromPos = base + match.index;
+              builder.add(fromPos, fromPos + match[0].length, hiddenMarkerDecoration);
+            }
+          }
+
+          if (line.to >= to) break;
+          line = doc.line(line.number + 1);
+        }
+      }
+
+      return builder.finish();
+    }
+  },
+  {
+    decorations: (plugin) => plugin.decorations,
+  }
 );
 
 export const CodeMirrorEditor = component$(
@@ -167,6 +333,14 @@ export const CodeMirrorEditor = component$(
       if (onViewReady$) {
         onViewReady$(view);
       }
+      if (variant === "live") {
+        view.dispatch({
+          effects: [
+            themeCompartment.reconfigure(livePreviewTheme),
+            presentationCompartment.reconfigure(hideMarkdownMarkersPlugin),
+          ],
+        });
+      }
 
       return () => {
         view.destroy();
@@ -198,9 +372,14 @@ export const CodeMirrorEditor = component$(
       const mode = track(() => variant);
       if (!view) return;
       view.dispatch({
-        effects: themeCompartment.reconfigure(
-          mode === "live" ? livePreviewTheme : defaultTheme
-        ),
+        effects: [
+          themeCompartment.reconfigure(
+            mode === "live" ? livePreviewTheme : defaultTheme
+          ),
+          presentationCompartment.reconfigure(
+            mode === "live" ? hideMarkdownMarkersPlugin : []
+          ),
+        ],
       });
     });
 
