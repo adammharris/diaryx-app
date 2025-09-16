@@ -14,6 +14,7 @@ import {
   ViewPlugin,
   Decoration,
   DecorationSet,
+  WidgetType,
 } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { RangeSetBuilder } from "@codemirror/state";
@@ -172,9 +173,52 @@ const livePreviewTheme = EditorView.theme(
   { dark: false }
 );
 
-const hiddenMarkerDecoration = Decoration.mark({ class: "cm-markdownMarker" });
+const hiddenMarkerDecoration = Decoration.replace({});
 
-const inlineMarkerRegex = /(```|~~~|\*\*|__|~~|`|\*|_)/g;
+const inlineMarkerRegex = /(`{1,3}|\*\*|__|~~|\*|_)/g;
+
+class BulletWidget extends WidgetType {
+  constructor(private char = "•") {
+    super();
+  }
+
+  toDOM() {
+    const span = document.createElement("span");
+    span.textContent = this.char;
+    span.style.marginRight = "0.75rem";
+    span.style.color = "rgba(71, 85, 105, 0.8)";
+    return span;
+  }
+}
+
+class OrderedWidget extends WidgetType {
+  constructor(private label: string) {
+    super();
+  }
+
+  toDOM() {
+    const span = document.createElement("span");
+    span.textContent = this.label;
+    span.style.marginRight = "0.75rem";
+    span.style.color = "rgba(71, 85, 105, 0.8)";
+    return span;
+  }
+}
+
+class TaskWidget extends WidgetType {
+  constructor(private checked: boolean) {
+    super();
+  }
+
+  toDOM() {
+    const box = document.createElement("span");
+    box.textContent = this.checked ? "☑" : "☐";
+    box.style.marginRight = "0.75rem";
+    box.style.fontSize = "0.95rem";
+    box.style.color = "rgba(71, 85, 105, 0.9)";
+    return box;
+  }
+}
 
 const hideMarkdownMarkersPlugin = ViewPlugin.fromClass(
   class {
@@ -214,28 +258,48 @@ const hideMarkdownMarkersPlugin = ViewPlugin.fromClass(
 
             const headingMatch = /^\s{0,3}(#{1,6})(?=\s)/.exec(text);
             if (headingMatch) {
-              builder.add(base + headingMatch.index, base + headingMatch.index + headingMatch[1].length, hiddenMarkerDecoration);
+              builder.add(
+                base + headingMatch.index,
+                base + headingMatch.index + headingMatch[1].length,
+                hiddenMarkerDecoration
+              );
             }
 
             const blockquoteMatch = /^\s{0,3}(>\s?)/.exec(text);
             if (blockquoteMatch) {
-              builder.add(base + blockquoteMatch.index, base + blockquoteMatch.index + blockquoteMatch[1].length, hiddenMarkerDecoration);
+              builder.add(
+                base + blockquoteMatch.index,
+                base + blockquoteMatch.index + blockquoteMatch[1].length,
+                hiddenMarkerDecoration
+              );
             }
 
             const taskMatch = /^\s{0,3}[*+-]\s+(\[[xX\s]\])/.exec(text);
             if (taskMatch) {
               const markerStart = text.indexOf(taskMatch[1]);
-              builder.add(base + markerStart, base + markerStart + taskMatch[1].length, hiddenMarkerDecoration);
+              builder.add(
+                base + markerStart,
+                base + markerStart + taskMatch[1].length,
+                Decoration.replace({ widget: new TaskWidget(/x/i.test(taskMatch[1])) })
+              );
             }
 
             const orderedMatch = /^\s{0,3}(\d+[.)])\s+/.exec(text);
             if (orderedMatch) {
-              builder.add(base + orderedMatch.index, base + orderedMatch.index + orderedMatch[1].length, hiddenMarkerDecoration);
+              builder.add(
+                base + orderedMatch.index,
+                base + orderedMatch.index + orderedMatch[0].length,
+                Decoration.replace({ widget: new OrderedWidget(orderedMatch[1]) })
+              );
             }
 
             const bulletMatch = /^\s{0,3}([*+-])\s+/.exec(text);
             if (bulletMatch) {
-              builder.add(base + bulletMatch.index, base + bulletMatch.index + bulletMatch[1].length, hiddenMarkerDecoration);
+              builder.add(
+                base + bulletMatch.index,
+                base + bulletMatch.index + bulletMatch[0].length,
+                Decoration.replace({ widget: new BulletWidget() })
+              );
             }
 
             const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(text);
@@ -249,14 +313,22 @@ const hideMarkdownMarkersPlugin = ViewPlugin.fromClass(
 
             const frontMatterMatch = /^\s{0,3}(---|\+\+\+)(\s.*)?$/.exec(text);
             if (frontMatterMatch) {
-              builder.add(base + frontMatterMatch.index, base + frontMatterMatch.index + frontMatterMatch[1].length, hiddenMarkerDecoration);
+              builder.add(
+                base + frontMatterMatch.index,
+                base + frontMatterMatch.index + frontMatterMatch[1].length,
+                hiddenMarkerDecoration
+              );
             }
 
             inlineMarkerRegex.lastIndex = 0;
             let match;
             while ((match = inlineMarkerRegex.exec(text)) !== null) {
               const fromPos = base + match.index;
-              builder.add(fromPos, fromPos + match[0].length, hiddenMarkerDecoration);
+              builder.add(
+                fromPos,
+                fromPos + match[0].length,
+                hiddenMarkerDecoration
+              );
             }
           }
 
@@ -295,6 +367,7 @@ export const CodeMirrorEditor = component$(
     // eslint-disable-next-line qwik/no-use-visible-task
     useVisibleTask$(({ track }) => {
       track(() => containerRef.value);
+      track(() => variant);
       const parent = containerRef.value;
       if (!parent) return;
 

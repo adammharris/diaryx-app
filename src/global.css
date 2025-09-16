@@ -326,6 +326,12 @@ body {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+.note-editor[data-mode="live"] .editor-panes,
+.note-editor[data-mode="source"] .editor-panes,
+.note-editor[data-mode="preview"] .editor-panes {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .note-editor[data-mode="source"] .editor-panes,
 .note-editor[data-mode="preview"] .editor-panes {
   grid-template-columns: minmax(0, 1fr);
@@ -547,15 +553,4 @@ body {
 
 .editor-pane.live .cm-scroller {
   background: transparent;
-}
-.cm-markdownMarker {
-  opacity: 0;
-  color: transparent;
-  transition: opacity 120ms ease;
-}
-
-.cm-activeLine .cm-markdownMarker,
-.cm-focused .cm-activeLine .cm-markdownMarker {
-  opacity: 1;
-  color: inherit;
 }
