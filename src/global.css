@@ -285,29 +285,38 @@ body {
   gap: 0.75rem;
 }
 
-.note-editor .mode-toggle {
-  display: inline-flex;
-  gap: 0.4rem;
-  padding: 0.3rem;
+.note-editor .view-select select {
+  appearance: none;
+  border: 1px solid var(--surface-border);
   border-radius: 14px;
-  background: var(--surface-glass);
-}
-
-.note-editor .mode-toggle button {
-  border: none;
-  border-radius: 12px;
-  padding: 0.45rem 0.9rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: transparent;
-  cursor: pointer;
-  transition: background 150ms ease, color 150ms ease;
-}
-
-.note-editor .mode-toggle button.active {
-  background: var(--surface-glass-strong);
+  padding: 0.55rem 2.5rem 0.55rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: var(--surface-elevated);
   color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  position: relative;
+}
+
+.note-editor .view-select {
+  position: relative;
+}
+
+.note-editor .view-select::after {
+  content: "▾";
+  position: absolute;
+  right: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-secondary);
+}
+
+.note-editor .view-select select:focus {
+  outline: none;
+  border-color: var(--surface-handle-hover);
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.25);
 }
 
 .note-editor .editor-panes {
@@ -349,6 +358,10 @@ body {
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
 }
 
+.note-editor .editor-pane.hidden {
+  display: none;
+}
+
 .note-editor .preview-pane {
   border-left: 1px solid var(--surface-border);
   background: var(--surface-elevated);
@@ -361,6 +374,13 @@ body {
 
 .note-editor .preview-pane.readonly {
   background: var(--surface-elevated);
+}
+
+.note-editor .preview-pane.interactive {
+  border-left: none;
+  padding: 2rem;
+  box-shadow: inset 0 0 0 1px var(--surface-border);
+  border-radius: 18px;
 }
 
 .note-editor .preview-pane :where(h1, h2, h3, p, ul, ol, blockquote) {

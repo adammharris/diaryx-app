@@ -47,8 +47,9 @@ export const NoteEditor = component$(() => {
     );
   }
 
-  const showEditorPane = viewMode.value !== "preview";
-  const showPreviewPane = viewMode.value !== "source";
+  const showEditorPane = viewMode.value === "split" || viewMode.value === "source";
+  const showPreviewPane = viewMode.value === "split" || viewMode.value === "preview" || viewMode.value === "live";
+  const isLivePreview = viewMode.value === "live";
 
   return (
     <section class="note-editor" data-mode={viewMode.value}>
@@ -60,46 +61,28 @@ export const NoteEditor = component$(() => {
           <span class="note-updated">Updated {note.metadata.updated}</span>
         </div>
         <div class="toolbar-groups">
-          <div class="mode-toggle" role="group" aria-label="Editor view modes">
-            <button
-              type="button"
-              class={{ active: viewMode.value === "split" }}
-              aria-pressed={viewMode.value === "split" ? "true" : "false"}
-              onClick$={() => {
-                viewMode.value = "split";
-                session.ui.editorMode = "split";
+          <label class="view-select">
+            <span class="sr-only">Editor view mode</span>
+            <select
+              value={viewMode.value}
+              onChange$={(event) => {
+                const target = event.target as HTMLSelectElement;
+                const value = target.value as typeof session.ui.editorMode;
+                viewMode.value = value;
+                session.ui.editorMode = value;
               }}
             >
-              Split
-            </button>
-            <button
-              type="button"
-              class={{ active: viewMode.value === "source" }}
-              aria-pressed={viewMode.value === "source" ? "true" : "false"}
-              onClick$={() => {
-                viewMode.value = "source";
-                session.ui.editorMode = "source";
-              }}
-            >
-              Source
-            </button>
-            <button
-              type="button"
-              class={{ active: viewMode.value === "preview" }}
-              aria-pressed={viewMode.value === "preview" ? "true" : "false"}
-              onClick$={() => {
-                viewMode.value = "preview";
-                session.ui.editorMode = "preview";
-              }}
-            >
-              Preview
-            </button>
-          </div>
+              <option value="split">Split view</option>
+              <option value="source">Source only</option>
+              <option value="preview">Preview only</option>
+              <option value="live">Live preview (beta)</option>
+            </select>
+          </label>
         </div>
       </header>
       <div class="editor-panes">
         {showEditorPane && (
-          <div class="editor-pane">
+          <div class={{ "editor-pane": true, hidden: isLivePreview }}>
             <textarea
               spellcheck={false}
               value={markdownSignal.value}
@@ -118,7 +101,8 @@ export const NoteEditor = component$(() => {
           <div
             class={{
               "preview-pane": true,
-              readonly: viewMode.value === "preview",
+              readonly: viewMode.value === "preview" || viewMode.value === "live",
+              interactive: isLivePreview,
             }}
             dangerouslySetInnerHTML={htmlSignal.value}
           />
