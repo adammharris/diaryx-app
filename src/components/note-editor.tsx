@@ -1,6 +1,7 @@
 import { component$, useSignal, useTask$ } from "@builder.io/qwik";
 import MarkdownIt from "markdown-it";
 import { stampNoteUpdated } from "../lib/diaryx/note-utils";
+import { CodeMirrorEditor } from "./codemirror-editor";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
 
 const md = new MarkdownIt({ html: true, linkify: true, typographer: true });
@@ -83,15 +84,11 @@ export const NoteEditor = component$(() => {
       <div class="editor-panes">
         {showEditorPane && (
           <div class={{ "editor-pane": true, hidden: isLivePreview }}>
-            <textarea
-              spellcheck={false}
+            <CodeMirrorEditor
               value={markdownSignal.value}
-              class={{ "code-mode": viewMode.value === "source" }}
-              placeholder="Write your Diaryx note here..."
-              onInput$={(event) => {
-                const target = event.target as HTMLTextAreaElement;
-                markdownSignal.value = target.value;
-                note.body = target.value;
+              onChange$={(next: string) => {
+                markdownSignal.value = next;
+                note.body = next;
                 stampNoteUpdated(note);
               }}
             />
