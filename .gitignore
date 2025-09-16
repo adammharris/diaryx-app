@@ -29,6 +29,8 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/*.code-snippets
 
+Diaryx Writing Specification.md
+
 .idea
 .DS_Store
 *.suo

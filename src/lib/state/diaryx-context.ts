@@ -1,0 +1,37 @@
+import { createContextId } from "@builder.io/qwik";
+import type { DiaryxNote } from "../diaryx/types";
+
+export type ThemePreference = "system" | "light" | "dark";
+
+export interface DiaryxUiState {
+  theme: ThemePreference;
+  leftPanelWidth: number;
+  rightPanelWidth: number;
+  showMetadata: boolean;
+  showLibrary: boolean;
+  showPreview: boolean;
+  showCommandPalette: boolean;
+  editorMode: "split" | "source" | "preview";
+}
+
+export interface DiaryxSessionState {
+  notes: DiaryxNote[];
+  activeNoteId?: string;
+  filters: {
+    query: string;
+    tag?: string;
+  };
+  ui: DiaryxUiState;
+  importState: {
+    isImporting: boolean;
+    lastError?: string;
+  };
+  exportState: {
+    isExporting: boolean;
+    lastSuccessAt?: number;
+  };
+}
+
+export const DiaryxSessionContext = createContextId<DiaryxSessionState>(
+  "diaryx.session"
+);
