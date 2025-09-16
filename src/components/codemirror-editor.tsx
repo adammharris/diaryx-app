@@ -98,47 +98,52 @@ const livePreviewTheme = EditorView.theme(
       display: "block",
       textDecoration: "none",
       color: "inherit",
+      paddingBottom: "0",
     },
     ".cm-header *, .cm-heading *": {
       textDecoration: "none",
     },
     ".cm-header.cm-header-1, .cm-heading.cm-heading1": {
       fontSize: "2.4rem",
-      lineHeight: "1.2",
-      marginTop: "2.6rem",
-      marginBottom: "1.25rem",
+      lineHeight: "1.15",
+      marginTop: "2.2rem",
+      marginBottom: "0.18rem",
     },
     ".cm-header.cm-header-2, .cm-heading.cm-heading2": {
       fontSize: "1.9rem",
-      lineHeight: "1.25",
-      marginTop: "2.2rem",
-      marginBottom: "1rem",
+      lineHeight: "1.18",
+      marginTop: "2rem",
+      marginBottom: "0.16rem",
     },
     ".cm-header.cm-header-3, .cm-heading.cm-heading3": {
       fontSize: "1.5rem",
-      lineHeight: "1.3",
-      marginTop: "1.8rem",
-      marginBottom: "0.85rem",
+      lineHeight: "1.2",
+      marginTop: "1.6rem",
+      marginBottom: "0.14rem",
     },
     ".cm-header.cm-header-4, .cm-heading.cm-heading4": {
       fontSize: "1.3rem",
-      lineHeight: "1.35",
-      marginTop: "1.5rem",
-      marginBottom: "0.7rem",
+      lineHeight: "1.25",
+      marginTop: "1.4rem",
+      marginBottom: "0.12rem",
     },
     ".cm-header.cm-header-5, .cm-heading.cm-heading5": {
       fontSize: "1.2rem",
       fontWeight: "600",
-      marginTop: "1.4rem",
-      marginBottom: "0.6rem",
+      marginTop: "1.2rem",
+      marginBottom: "0.1rem",
     },
     ".cm-header.cm-header-6, .cm-heading.cm-heading6": {
       fontSize: "1.1rem",
       fontWeight: "600",
-      marginTop: "1.3rem",
-      marginBottom: "0.6rem",
+      marginTop: "1.1rem",
+      marginBottom: "0.1rem",
       textTransform: "uppercase",
       letterSpacing: "0.08em",
+    },
+    ".cm-heading-next": {
+      paddingTop: "0",
+      marginTop: "-0.18rem",
     },
     ".cm-strong": {
       fontWeight: "600",
@@ -208,6 +213,8 @@ const headingLineDecorations = Array.from({ length: 6 }, (_, index) =>
   Decoration.line({ class: `cm-header cm-header-${index + 1}` })
 );
 
+const headingNextLineDecoration = Decoration.line({ class: "cm-heading-next" });
+
 const livePreviewHighlightStyle = HighlightStyle.define([
   {
     tag: [
@@ -220,6 +227,10 @@ const livePreviewHighlightStyle = HighlightStyle.define([
       tags.heading6,
     ],
     textDecoration: "none",
+  },
+  {
+    tag: tags.monospace,
+    class: "cm-inlineCode",
   },
 ]);
 
@@ -305,9 +316,16 @@ const hideMarkdownMarkersPlugin = ViewPlugin.fromClass(
 
           const headingMatch = /^\s{0,3}(#{1,6})(?=\s)/.exec(text);
           let headingWhitespaceLength = 0;
+          let nextLineFrom: number | undefined;
           if (headingMatch) {
             const level = Math.min(headingMatch[1].length, 6);
             builder.add(base, base, headingLineDecorations[level - 1]);
+            if (line.number < doc.lines) {
+              const nextLine = doc.line(line.number + 1);
+              if (nextLine.text.trim().length > 0) {
+                nextLineFrom = nextLine.from;
+              }
+            }
             const afterHashes = text.slice(
               headingMatch.index + headingMatch[1].length
             );
@@ -401,6 +419,10 @@ const hideMarkdownMarkersPlugin = ViewPlugin.fromClass(
                 hiddenMarkerDecoration
               );
             }
+          }
+
+          if (nextLineFrom !== undefined) {
+            builder.add(nextLineFrom, nextLineFrom, headingNextLineDecoration);
           }
 
           if (line.to >= to) break;
