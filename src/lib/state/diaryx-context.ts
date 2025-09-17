@@ -12,6 +12,7 @@ export interface DiaryxUiState {
   showPreview: boolean;
   showCommandPalette: boolean;
   editorMode: "split" | "source" | "preview" | "live";
+  showSettings: boolean;
 }
 
 export interface DiaryxSessionState {

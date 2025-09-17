@@ -1,4 +1,4 @@
-import { component$, $, useSignal } from "@builder.io/qwik";
+import { component$, $, useSignal, type QwikMouseEvent } from "@builder.io/qwik";
 import {
   exportDiaryxNoteToHtml,
   exportDiaryxNoteToMarkdown,
@@ -59,6 +59,22 @@ export const NoteList = component$(() => {
     exportFormatSignal.value = format;
     await handleExportActive(format);
     exportFormatSignal.value = "";
+  });
+
+  const handleOpenSettings = $(() => {
+    session.ui.showSettings = true;
+  });
+
+  const handleCloseSettings = $(() => {
+    session.ui.showSettings = false;
+  });
+
+  const handleOverlayClick = $((event: QwikMouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement | null;
+    const currentTarget = event.currentTarget as HTMLElement | null;
+    if (target && target === currentTarget) {
+      session.ui.showSettings = false;
+    }
   });
 
   const handleImport = $(async (files: FileList | null) => {
@@ -134,6 +150,9 @@ export const NoteList = component$(() => {
             <option value="html">Export HTML</option>
             <option value="markdown">Export Markdown</option>
           </select>
+          <button type="button" onClick$={handleOpenSettings}>
+            Settings
+          </button>
         </div>
         <input
           aria-label="Search notes"
@@ -176,6 +195,39 @@ export const NoteList = component$(() => {
           );
         })}
       </ul>
+      {session.ui.showSettings && (
+        <div
+          class="settings-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-dialog-title"
+          aria-describedby="settings-dialog-description"
+          onClick$={handleOverlayClick}
+        >
+          <div class="settings-dialog">
+            <header>
+              <h2 id="settings-dialog-title">Editor Settings</h2>
+              <button
+                type="button"
+                class="close-button"
+                onClick$={handleCloseSettings}
+                aria-label="Close settings"
+              >
+                &times;
+              </button>
+            </header>
+            <div class="settings-content" id="settings-dialog-description">
+              <p>Customize themes, layout, and editor preferences (coming soon).</p>
+              <p>Let us know what settings you would like to see here.</p>
+            </div>
+            <footer>
+              <button type="button" onClick$={handleCloseSettings}>
+                Done
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </aside>
   );
 });

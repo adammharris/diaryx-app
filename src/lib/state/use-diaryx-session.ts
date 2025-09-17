@@ -20,6 +20,7 @@ const createInitialState = (): DiaryxSessionState => {
     showPreview: true,
     showCommandPalette: false,
     editorMode: "split",
+    showSettings: false,
   },
   importState: {
     isImporting: false,
