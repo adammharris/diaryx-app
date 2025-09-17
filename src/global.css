@@ -255,10 +255,13 @@ input[type="radio"] {
 .note-list ul {
   list-style: none;
   margin: 0;
-  padding: 0.25rem;
+  padding: 0 1rem 1rem;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .note-list .settings-overlay {
@@ -768,7 +771,13 @@ input[type="radio"] {
   box-shadow: inset 0 0 0 2px var(--accent-ring);
 }
 
-.note-list li button {
+.note-list ul.note-items li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.note-list li .note-open {
   width: 100%;
   border: none;
   background: transparent;
@@ -786,21 +795,49 @@ input[type="radio"] {
     box-shadow 160ms ease;
 }
 
-.note-list li button:hover {
+.note-list li .note-open:hover {
   background: var(--accent-soft);
   transform: translateY(-1px);
 }
 
-.note-list li.active button {
+.note-list li.active .note-open {
   background: var(--accent-surface);
   box-shadow: inset 0 0 0 1px var(--accent-ring);
   font-weight: 600;
 }
 
-.note-list li button:focus-visible {
+.note-list li .note-open:focus-visible {
   outline: none;
   background: var(--accent-surface);
   box-shadow: inset 0 0 0 2px var(--accent-ring);
+}
+
+.note-list li .note-delete {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.note-list li .note-delete:hover {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  transform: translateY(-1px);
+}
+
+.note-list li .note-delete:focus-visible {
+  outline: none;
+  background: rgba(220, 38, 38, 0.18);
+  color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.35);
 }
 
 .note-list .title {

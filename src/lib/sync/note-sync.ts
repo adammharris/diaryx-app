@@ -134,3 +134,15 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
   await repo.clear();
   await Promise.all(nextNotes.map((note) => repo.save(note)));
 };
+
+export const deleteNoteOnServer = async (noteId: string) => {
+  if (typeof fetch === "undefined") return;
+  try {
+    await fetch(`/api/notes/${encodeURIComponent(noteId)}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+  } catch (error) {
+    console.warn("Failed to delete note on server", error);
+  }
+};

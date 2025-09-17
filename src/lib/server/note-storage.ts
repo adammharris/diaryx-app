@@ -74,3 +74,8 @@ export const deleteAllNotesForUser = async (userId: string) => {
   await ensureNotesTable(dbPool);
   await dbPool.query(`DELETE FROM diaryx_note WHERE user_id = $1`, [userId]);
 };
+
+export const deleteNoteForUser = async (userId: string, noteId: string) => {
+  await ensureNotesTable(dbPool);
+  await dbPool.query(`DELETE FROM diaryx_note WHERE user_id = $1 AND id = $2`, [userId, noteId]);
+};

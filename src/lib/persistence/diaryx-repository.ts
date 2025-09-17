@@ -8,6 +8,7 @@ export interface DiaryxRepository {
   save(note: DiaryxNote): Promise<void>;
   remove(id: string): Promise<void>;
   clear(): Promise<void>;
+  listIds(): Promise<string[]>;
 }
 
 const loadIndex = async (): Promise<string[]> => {
@@ -51,5 +52,7 @@ export const createDiaryxRepository = (): DiaryxRepository => ({
     await Promise.all(ids.map((id) => del(noteKey(id))));
     await persistIndex([]);
   },
+  async listIds() {
+    return loadIndex();
+  },
 });
-

@@ -27,6 +27,8 @@ const randomId = () => {
   return `${Date.now()}-welcome-${Math.random().toString(36).slice(2, 8)}`;
 };
 
+export const generateNoteId = randomId;
+
 export const createWelcomeNote = (): DiaryxNote => ({
   id: randomId(),
   body: baseBody,

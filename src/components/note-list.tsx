@@ -14,6 +14,9 @@ import { parseDiaryxFile, DiaryxParseError } from "../lib/diaryx/parser";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
 import type { ThemePreference, ColorAccent } from "../lib/state/diaryx-context";
 import { AuthSection } from "./settings/auth-section";
+import { createDiaryxRepository } from "../lib/persistence/diaryx-repository";
+import { persistMarkdownNotes } from "../lib/persistence/markdown-store";
+import { deleteNoteOnServer } from "../lib/sync/note-sync";
 
 export const NoteList = component$(() => {
   const session = useDiaryxSession();
@@ -64,6 +67,39 @@ export const NoteList = component$(() => {
     session.notes.unshift(newNote);
     session.activeNoteId = newNote.id;
   });
+
+  const handleDeleteNote = $(
+    async (noteId: string, event?: Event, options?: { confirm?: boolean }) => {
+      event?.stopPropagation();
+      event?.preventDefault();
+
+      if (options?.confirm !== false && typeof window !== "undefined") {
+        const confirmed = window.confirm("Delete this note permanently?");
+        if (!confirmed) return;
+      }
+
+      const index = session.notes.findIndex((note) => note.id === noteId);
+      if (index === -1) return;
+
+      session.notes.splice(index, 1);
+
+      if (session.activeNoteId === noteId) {
+        const fallback =
+          session.notes[index] || session.notes[index - 1] || session.notes[0];
+        session.activeNoteId = fallback?.id;
+      }
+
+      const repo = createDiaryxRepository();
+      await repo.remove(noteId);
+      persistMarkdownNotes(session.notes);
+
+      try {
+        await deleteNoteOnServer(noteId);
+      } catch (error) {
+        console.warn("Failed to delete note on server", error);
+      }
+    }
+  );
 
   const handleExportActive = $(async (format: "html" | "markdown") => {
     const note = session.notes.find((item) => item.id === session.activeNoteId);
@@ -208,7 +244,7 @@ export const NoteList = component$(() => {
             }}
           >
             <option value="" disabled>
-              Export…
+              What format?
             </option>
             <option value="html">Export HTML</option>
             <option value="markdown">Export Markdown</option>
@@ -244,15 +280,28 @@ export const NoteList = component$(() => {
         ref={fileInputSignal}
         onChange$={(event) => handleImport((event.target as HTMLInputElement).files)}
       />
-      <ul>
+      <ul class="note-items">
         {filteredNotes.map((note) => {
           const isActive = session.activeNoteId === note.id;
           const preview = note.body.split("\n")[0]?.slice(0, 80) ?? "";
           return (
             <li key={note.id} class={{ active: isActive }}>
-              <button type="button" onClick$={() => handleSelect(note.id)}>
+              <button
+                type="button"
+                class="note-open"
+                onClick$={() => handleSelect(note.id)}
+              >
                 <span class="title">{note.metadata.title}</span>
                 <span class="preview">{preview}</span>
+              </button>
+              <button
+                type="button"
+                class="note-delete"
+                aria-label="Delete note"
+                title="Delete note"
+                onClick$={(event) => handleDeleteNote(note.id, event)}
+              >
+                ×
               </button>
             </li>
           );
