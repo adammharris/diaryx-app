@@ -39,6 +39,8 @@ export interface DiaryxNote {
   metadata: DiaryxMetadata;
   /** Cached YAML frontmatter string, without leading/ending separators. */
   frontmatter?: string;
+  /** Whether the `updated` timestamp should refresh automatically. */
+  autoUpdateTimestamp?: boolean;
   /**
    * When import/export operations supply original filename this keeps reference for display.
    */

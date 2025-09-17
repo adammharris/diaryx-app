@@ -1,6 +1,6 @@
 import matter from "gray-matter";
 import yaml from "js-yaml";
-import { validateDiaryxMetadata } from "./validation";
+import { normalizeDiaryxMetadata } from "./metadata-utils";
 import type { DiaryxParseResult, DiaryxNote } from "./types";
 
 type MinimalBuffer = {
@@ -53,26 +53,18 @@ export const parseDiaryxString = (
     excerpt: false,
   });
 
-  if (!parsed.data || Object.keys(parsed.data).length === 0) {
-    throw new DiaryxParseError("Diaryx files require YAML frontmatter");
-  }
-
-  const { success, metadata, issues } = validateDiaryxMetadata(parsed.data);
-  if (!success || !metadata) {
-    throw new DiaryxParseError(
-      `Invalid Diaryx metadata: ${issues
-        .map((issue) => issue.message)
-        .join(", ") || "unknown"}`
-    );
-  }
+  const { metadata, issues } = normalizeDiaryxMetadata(parsed.data as
+    | Record<string, unknown>
+    | undefined);
 
   const note: DiaryxNote = {
     id: options.id ?? randomId(),
     body: parsed.content.trimStart(),
     metadata,
-    frontmatter: parsed.matter,
+    frontmatter: parsed.matter?.trim().length ? parsed.matter : undefined,
     sourceName: options.sourceName,
     lastModified: Date.now(),
+    autoUpdateTimestamp: Boolean(metadata.updated),
   };
 
   return {

@@ -4,7 +4,7 @@ export const stampNoteUpdated = (
   note: DiaryxNote,
   options: { skipMetadata?: boolean } = {}
 ) => {
-  if (!options.skipMetadata) {
+  if (!options.skipMetadata && note.autoUpdateTimestamp !== false) {
     note.metadata.updated = new Date().toISOString();
   }
   note.lastModified = Date.now();

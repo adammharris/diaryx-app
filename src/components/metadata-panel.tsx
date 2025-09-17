@@ -2,11 +2,73 @@ import { component$, useSignal, useTask$ } from "@builder.io/qwik";
 import type { Signal } from "@builder.io/qwik";
 import yaml from "js-yaml";
 import { stampNoteUpdated } from "../lib/diaryx/note-utils";
-import { validateDiaryxMetadata } from "../lib/diaryx/validation";
+import {
+  describeIssues,
+  missingMetadataFields,
+  normalizeDiaryxMetadata,
+  REQUIRED_METADATA_FIELDS,
+} from "../lib/diaryx/metadata-utils";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
 import type { DiaryxNote } from "../lib/diaryx/types";
 
-const formatYaml = (data: unknown): string => yaml.dump(data).trimEnd();
+const isEmptyMetadataValue = (value: unknown): boolean => {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string") return value.trim().length === 0;
+  if (Array.isArray(value)) return value.length === 0;
+  return false;
+};
+
+const formatYaml = (data: unknown): string => {
+  if (!data || typeof data !== "object") return "";
+  const entries = Object.entries(data as Record<string, unknown>).filter(
+    ([, value]) => !isEmptyMetadataValue(value)
+  );
+  if (!entries.length) {
+    return "";
+  }
+  return yaml.dump(Object.fromEntries(entries)).trimEnd();
+};
+
+const syncFrontmatter = (note: DiaryxNote, rawYaml: Signal<string>) => {
+  const formatted = formatYaml(note.metadata);
+  rawYaml.value = formatted;
+  note.frontmatter = formatted || undefined;
+};
+
+const KNOWN_METADATA_KEYS = new Set<string>([
+  ...REQUIRED_METADATA_FIELDS,
+  "version",
+  "copying",
+  "contents",
+  "part_of",
+  "checksums",
+  "banner",
+  "language",
+  "tags",
+  "aliases",
+  "this_file_is_root_index",
+  "starred",
+  "pinned",
+]);
+
+const formatExtraValue = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
+      .join(", ");
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === "object" && value !== null) {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return value == null ? "" : String(value);
+};
 
 const toList = (value: string | string[]): string =>
   Array.isArray(value) ? value.join("\n") : value;
@@ -31,8 +93,7 @@ const setMetadataField = (
 ) => {
   (note.metadata as Record<string, unknown>)[key] = value;
   stampNoteUpdated(note, { skipMetadata: skipMetadataTimestamp });
-  rawYaml.value = formatYaml(note.metadata);
-  note.frontmatter = rawYaml.value;
+  syncFrontmatter(note, rawYaml);
 };
 
 const applyRawYaml = (
@@ -44,18 +105,64 @@ const applyRawYaml = (
   rawYaml.value = value;
   try {
     const parsed = yaml.load(value) ?? {};
-    const result = validateDiaryxMetadata(parsed);
-    if (!result.success || !result.metadata) {
-      yamlError.value = result.issues.map((issue) => issue.message).join("; ");
+    if (parsed && typeof parsed !== "object") {
+      yamlError.value = "YAML must describe an object";
       return;
     }
-    Object.assign(note.metadata, result.metadata);
+    const { metadata, issues } = normalizeDiaryxMetadata(
+      parsed as Record<string, unknown>
+    );
+    Object.assign(note.metadata, metadata);
     stampNoteUpdated(note, { skipMetadata: true });
-    yamlError.value = undefined;
-    note.frontmatter = formatYaml(note.metadata);
+    yamlError.value = describeIssues(issues);
+    if (value.trim().length) {
+      note.frontmatter = value;
+      rawYaml.value = value;
+    } else {
+      note.frontmatter = undefined;
+      syncFrontmatter(note, rawYaml);
+    }
   } catch (error) {
     yamlError.value = error instanceof Error ? error.message : "Invalid YAML";
   }
+};
+
+const toDateTimeInputValue = (iso: string | undefined): string => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (input: number) => input.toString().padStart(2, "0");
+  const yyyy = date.getFullYear();
+  const mm = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+};
+
+const fromDateTimeInputValue = (value: string): string => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toISOString();
+};
+
+const isAutoUpdateEnabled = (note: DiaryxNote): boolean =>
+  note.autoUpdateTimestamp !== false;
+
+const toggleAutoUpdate = (
+  note: DiaryxNote,
+  enabled: boolean,
+  rawYaml: Signal<string>
+) => {
+  note.autoUpdateTimestamp = enabled;
+  if (enabled && !note.metadata.updated) {
+    (note.metadata as Record<string, unknown>).updated = new Date().toISOString();
+  }
+  stampNoteUpdated(note, { skipMetadata: true });
+  syncFrontmatter(note, rawYaml);
 };
 
 export const MetadataPanel = component$(() => {
@@ -69,7 +176,7 @@ export const MetadataPanel = component$(() => {
     track(() => session.activeNoteId);
     const current = session.notes.find((item) => item.id === session.activeNoteId);
     if (current) {
-      rawYaml.value = formatYaml(current.metadata);
+      syncFrontmatter(current, rawYaml);
       yamlError.value = undefined;
     }
   });
@@ -81,6 +188,12 @@ export const MetadataPanel = component$(() => {
       </aside>
     );
   }
+
+  const missingRequired = missingMetadataFields(note.metadata);
+  const extraEntries = Object.entries(note.metadata).filter(
+    ([key]) => !KNOWN_METADATA_KEYS.has(key)
+  );
+  const autoUpdate = isAutoUpdateEnabled(note);
 
   return (
     <aside
@@ -109,7 +222,19 @@ export const MetadataPanel = component$(() => {
       {activeTab.value === "details" ? (
         <form class="details" preventdefault:submit>
           <label>
-            <span>Title</span>
+            <span class="field-heading">
+              <span>Title</span>
+              {missingRequired.has("title") && (
+                <span
+                  class="field-warning"
+                  role="img"
+                  aria-label="Missing required metadata"
+                  title="Missing required metadata"
+                >
+                  ⚠︎
+                </span>
+              )}
+            </span>
             <input
               value={note.metadata.title}
               onInput$={(event) =>
@@ -123,7 +248,19 @@ export const MetadataPanel = component$(() => {
             />
           </label>
           <label>
-            <span>Author</span>
+            <span class="field-heading">
+              <span>Author</span>
+              {missingRequired.has("author") && (
+                <span
+                  class="field-warning"
+                  role="img"
+                  aria-label="Missing required metadata"
+                  title="Missing required metadata"
+                >
+                  ⚠︎
+                </span>
+              )}
+            </span>
             <textarea
               value={toList(note.metadata.author)}
               onInput$={(event) =>
@@ -137,37 +274,87 @@ export const MetadataPanel = component$(() => {
             />
           </label>
           <label>
-            <span>Created</span>
-            <input
-              value={note.metadata.created}
-              onInput$={(event) =>
-                setMetadataField(
-                  note,
-                  "created",
-                  (event.target as HTMLInputElement).value,
-                  rawYaml,
-                  true
-                )
-              }
-            />
+            <span class="field-heading">
+              <span>Created</span>
+              {missingRequired.has("created") && (
+                <span
+                  class="field-warning"
+                  role="img"
+                  aria-label="Missing required metadata"
+                  title="Missing required metadata"
+                >
+                  ⚠︎
+                </span>
+              )}
+            </span>
+            <div class="timestamp-field">
+              <input
+                type="datetime-local"
+                step="60"
+                value={toDateTimeInputValue(note.metadata.created)}
+                onInput$={(event) => {
+                  const target = event.target as HTMLInputElement;
+                  const iso = fromDateTimeInputValue(target.value);
+                  setMetadataField(note, "created", iso, rawYaml, true);
+                }}
+              />
+            </div>
           </label>
           <label>
-            <span>Updated</span>
-            <input
-              value={note.metadata.updated}
-              onInput$={(event) =>
-                setMetadataField(
-                  note,
-                  "updated",
-                  (event.target as HTMLInputElement).value,
-                  rawYaml,
-                  true
-                )
-              }
-            />
+            <span class="field-heading">
+              <span>Updated</span>
+              {missingRequired.has("updated") && (
+                <span
+                  class="field-warning"
+                  role="img"
+                  aria-label="Missing required metadata"
+                  title="Missing required metadata"
+                >
+                  ⚠︎
+                </span>
+              )}
+            </span>
+            <div class="timestamp-field">
+              <input
+                type="datetime-local"
+                step="60"
+                value={toDateTimeInputValue(note.metadata.updated)}
+                onInput$={(event) => {
+                  const target = event.target as HTMLInputElement;
+                  const iso = fromDateTimeInputValue(target.value);
+                  setMetadataField(note, "updated", iso, rawYaml, true);
+                }}
+              />
+              <label class={{ "auto-update-toggle": true, active: autoUpdate }}>
+                <input
+                  type="checkbox"
+                  checked={autoUpdate}
+                  onInput$={(event) =>
+                    toggleAutoUpdate(
+                      note,
+                      (event.target as HTMLInputElement).checked,
+                      rawYaml
+                    )
+                  }
+                />
+                <span>Auto update</span>
+              </label>
+            </div>
           </label>
           <label>
-            <span>Visibility</span>
+            <span class="field-heading">
+              <span>Visibility</span>
+              {missingRequired.has("visibility") && (
+                <span
+                  class="field-warning"
+                  role="img"
+                  aria-label="Missing required metadata"
+                  title="Missing required metadata"
+                >
+                  ⚠︎
+                </span>
+              )}
+            </span>
             <textarea
               value={toList(note.metadata.visibility)}
               onInput$={(event) =>
@@ -181,7 +368,19 @@ export const MetadataPanel = component$(() => {
             />
           </label>
           <label>
-            <span>Format</span>
+            <span class="field-heading">
+              <span>Format</span>
+              {missingRequired.has("format") && (
+                <span
+                  class="field-warning"
+                  role="img"
+                  aria-label="Missing required metadata"
+                  title="Missing required metadata"
+                >
+                  ⚠︎
+                </span>
+              )}
+            </span>
             <textarea
               value={toList(note.metadata.format)}
               onInput$={(event) =>
@@ -195,7 +394,19 @@ export const MetadataPanel = component$(() => {
             />
           </label>
           <label>
-            <span>Reachable</span>
+            <span class="field-heading">
+              <span>Reachable</span>
+              {missingRequired.has("reachable") && (
+                <span
+                  class="field-warning"
+                  role="img"
+                  aria-label="Missing required metadata"
+                  title="Missing required metadata"
+                >
+                  ⚠︎
+                </span>
+              )}
+            </span>
             <textarea
               value={toList(note.metadata.reachable)}
               onInput$={(event) =>
@@ -291,6 +502,22 @@ export const MetadataPanel = component$(() => {
             />
             <span>Pinned</span>
           </label>
+          {extraEntries.length > 0 && (
+            <section class="additional-properties">
+              <header>
+                <h3>Additional properties</h3>
+                <p>Edit in the YAML tab</p>
+              </header>
+              <ul>
+                {extraEntries.map(([key, value]) => (
+                  <li key={key}>
+                    <span class="extra-key">{key}</span>
+                    <span class="extra-value">{formatExtraValue(value)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </form>
       ) : (
         <div class="raw-editor">

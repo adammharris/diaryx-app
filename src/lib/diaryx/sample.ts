@@ -32,6 +32,7 @@ export const createWelcomeNote = (): DiaryxNote => ({
   body: baseBody,
   metadata: baseMetadata,
   frontmatter: yaml.dump(baseMetadata).trimEnd(),
+  autoUpdateTimestamp: true,
   lastModified: Date.now(),
 });
 
@@ -52,6 +53,7 @@ export const createBlankNote = (overrides: Partial<DiaryxNote> = {}): DiaryxNote
     body: "# Untitled\n",
     metadata: blankMetadata,
     frontmatter: yaml.dump(blankMetadata).trimEnd(),
+    autoUpdateTimestamp: true,
     lastModified: Date.now(),
   };
 

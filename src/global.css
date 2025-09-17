@@ -559,6 +559,21 @@ body {
   color: var(--text-secondary);
 }
 
+.metadata-panel .field-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: inherit;
+}
+
+.metadata-panel .field-warning {
+  color: #facc15;
+  font-size: 0.9rem;
+  line-height: 1;
+  display: inline-flex;
+}
+
 .metadata-panel form.details input,
 .metadata-panel form.details textarea {
   border: none;
@@ -570,6 +585,30 @@ body {
   color: var(--text-primary);
   min-height: 2.4rem;
   outline: none;
+}
+
+.metadata-panel .timestamp-field {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.metadata-panel .timestamp-field input[type="datetime-local"] {
+  flex: 1;
+  min-height: 2.4rem;
+}
+
+.metadata-panel .auto-update-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.metadata-panel .auto-update-toggle.active {
+  color: var(--text-primary);
 }
 
 .metadata-panel form.details textarea {
@@ -615,6 +654,61 @@ body {
   margin: 0;
   color: #dc2626;
   font-size: 0.8rem;
+}
+
+.metadata-panel .additional-properties {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: var(--surface-glass);
+}
+
+.metadata-panel .additional-properties header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.metadata-panel .additional-properties header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.metadata-panel .additional-properties header p {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.metadata-panel .additional-properties ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.metadata-panel .additional-properties li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.metadata-panel .extra-key {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.metadata-panel .extra-value {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  word-break: break-word;
 }
 
 .metadata-panel.empty {
