@@ -11,6 +11,12 @@
   --surface-glass-strong: rgba(148, 163, 184, 0.3);
   --text-primary: #0f172a;
   --text-secondary: rgba(15, 23, 42, 0.62);
+  --surface-toolbar: rgba(255, 255, 255, 0.6);
+  --focus-ring: rgba(148, 163, 184, 0.25);
+  --editor-code-bg: rgba(15, 23, 42, 0.06);
+  --editor-code-border: rgba(15, 23, 42, 0.04);
+  --code-block-bg: rgba(15, 23, 42, 0.08);
+  --inline-code-bg: rgba(148, 163, 184, 0.2);
   --frame-pad-x: env(safe-area-inset-left, 0px);
   --frame-pad-y: env(safe-area-inset-top, 0px);
 }
@@ -26,6 +32,33 @@
   --surface-glass-strong: rgba(148, 163, 184, 0.5);
   --text-primary: rgba(226, 232, 240, 0.96);
   --text-secondary: rgba(148, 163, 184, 0.75);
+  --surface-toolbar: rgba(15, 23, 42, 0.85);
+  --focus-ring: rgba(148, 163, 184, 0.35);
+  --editor-code-bg: rgba(15, 23, 42, 0.6);
+  --editor-code-border: rgba(148, 163, 184, 0.22);
+  --code-block-bg: rgba(15, 23, 42, 0.75);
+  --inline-code-bg: rgba(148, 163, 184, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-base: #0f172a;
+    --surface-elevated: rgba(15, 23, 42, 0.96);
+    --surface-border: rgba(148, 163, 184, 0.25);
+    --surface-border-strong: rgba(71, 85, 105, 0.35);
+    --surface-handle: rgba(71, 85, 105, 0.55);
+    --surface-handle-hover: rgba(148, 163, 184, 0.75);
+    --surface-glass: rgba(71, 85, 105, 0.4);
+    --surface-glass-strong: rgba(148, 163, 184, 0.5);
+    --text-primary: rgba(226, 232, 240, 0.96);
+    --text-secondary: rgba(148, 163, 184, 0.75);
+    --surface-toolbar: rgba(15, 23, 42, 0.85);
+    --focus-ring: rgba(148, 163, 184, 0.35);
+    --editor-code-bg: rgba(15, 23, 42, 0.6);
+    --editor-code-border: rgba(148, 163, 184, 0.22);
+    --code-block-bg: rgba(15, 23, 42, 0.75);
+    --inline-code-bg: rgba(148, 163, 184, 0.28);
+  }
 }
 
 html,
@@ -251,8 +284,8 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 1.25rem 1.5rem 1rem;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.4);
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--surface-toolbar);
   backdrop-filter: blur(24px);
 }
 
@@ -316,7 +349,7 @@ body {
 .note-editor .view-select select:focus {
   outline: none;
   border-color: var(--surface-handle-hover);
-  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.25);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .note-editor .editor-panes {
@@ -358,10 +391,10 @@ body {
 }
 
 .note-editor textarea.code-mode {
-  background: rgba(15, 23, 42, 0.06);
+  background: var(--editor-code-bg);
   border-radius: 18px;
   padding: 1.25rem 1.5rem;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+  box-shadow: inset 0 0 0 1px var(--editor-code-border);
 }
 
 .note-editor .editor-pane.hidden {
@@ -409,44 +442,44 @@ body {
 
 .note-editor .preview-pane h1 {
   font-size: 2.4rem;
-  line-height: 1.2;
-  margin-bottom: 0.85rem;
+  line-height: 1.1;
+  margin-bottom: 0.08rem;
 }
 
 .note-editor .preview-pane h2 {
   font-size: 1.9rem;
-  line-height: 1.25;
-  margin-bottom: 0.75rem;
+  line-height: 1.12;
+  margin-bottom: 0.08rem;
 }
 
 .note-editor .preview-pane h3 {
   font-size: 1.5rem;
-  line-height: 1.3;
-  margin-bottom: 0.6rem;
+  line-height: 1.15;
+  margin-bottom: 0.06rem;
 }
 
 .note-editor .preview-pane h4 {
   font-size: 1.3rem;
-  line-height: 1.35;
-  margin-bottom: 0.5rem;
+  line-height: 1.2;
+  margin-bottom: 0.06rem;
 }
 
 .note-editor .preview-pane h5 {
   font-size: 1.2rem;
   font-weight: 600;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.05rem;
 }
 
 .note-editor .preview-pane h6 {
   font-size: 1.1rem;
   font-weight: 600;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.05rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
 .note-editor .preview-pane :where(pre) {
-  background: rgba(15, 23, 42, 0.08);
+  background: var(--code-block-bg);
   padding: 1rem;
   border-radius: 14px;
   overflow-x: auto;
@@ -459,6 +492,18 @@ body {
   font-family: SFMono-Regular, "JetBrains Mono", ui-monospace, SFMono-Regular,
     monospace;
   font-size: 0.95rem;
+}
+
+.note-editor .preview-pane :where(pre > code) {
+  background: transparent;
+  padding: 0;
+  display: block;
+}
+
+.note-editor .preview-pane :where(code):not(:where(pre > code)) {
+  background: var(--inline-code-bg);
+  padding: 0.2rem 0.4rem;
+  border-radius: 8px;
 }
 
 
