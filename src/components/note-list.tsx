@@ -1,4 +1,10 @@
-import { component$, $, useSignal, type QwikMouseEvent } from "@builder.io/qwik";
+import {
+  component$,
+  $,
+  useSignal,
+  useVisibleTask$,
+  type QwikMouseEvent,
+} from "@builder.io/qwik";
 import {
   exportDiaryxNoteToHtml,
   exportDiaryxNoteToMarkdown,
@@ -6,12 +12,45 @@ import {
 import { createBlankNote } from "../lib/diaryx/sample";
 import { parseDiaryxFile, DiaryxParseError } from "../lib/diaryx/parser";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
+import type { ThemePreference, ColorAccent } from "../lib/state/diaryx-context";
 
 export const NoteList = component$(() => {
   const session = useDiaryxSession();
   const querySignal = useSignal(session.filters.query);
   const fileInputSignal = useSignal<HTMLInputElement>();
   const exportFormatSignal = useSignal("");
+
+  const themeOptions: ReadonlyArray<{
+    value: ThemePreference;
+    label: string;
+    description: string;
+  }> = [
+    {
+      value: "system",
+      label: "System",
+      description: "Follow your device preference",
+    },
+    {
+      value: "light",
+      label: "Light",
+      description: "Bright surfaces with dark text",
+    },
+    {
+      value: "dark",
+      label: "Dark",
+      description: "Dim surfaces with soft contrast",
+    },
+  ];
+
+  const accentOptions: ReadonlyArray<{
+    value: ColorAccent;
+    label: string;
+  }> = [
+    { value: "violet", label: "Violet" },
+    { value: "blue", label: "Blue" },
+    { value: "teal", label: "Teal" },
+    { value: "amber", label: "Amber" },
+  ];
 
   const handleSelect = $((noteId: string) => {
     session.activeNoteId = noteId;
@@ -69,6 +108,14 @@ export const NoteList = component$(() => {
     session.ui.showSettings = false;
   });
 
+  const handleThemeSelect = $((theme: ThemePreference) => {
+    session.ui.theme = theme;
+  });
+
+  const handleAccentSelect = $((accent: ColorAccent) => {
+    session.ui.accent = accent;
+  });
+
   const handleOverlayClick = $((event: QwikMouseEvent<HTMLElement>) => {
     const target = event.target as HTMLElement | null;
     const currentTarget = event.currentTarget as HTMLElement | null;
@@ -113,6 +160,19 @@ export const NoteList = component$(() => {
       note.metadata.title.toLowerCase().includes(query) ||
       note.body.toLowerCase().includes(query)
     );
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track, cleanup }) => {
+    track(() => session.ui.showSettings);
+    if (!session.ui.showSettings) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        session.ui.showSettings = false;
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    cleanup(() => window.removeEventListener("keydown", handleKeyDown));
   });
 
   return (
@@ -217,8 +277,60 @@ export const NoteList = component$(() => {
               </button>
             </header>
             <div class="settings-content" id="settings-dialog-description">
-              <p>Customize themes, layout, and editor preferences (coming soon).</p>
-              <p>Let us know what settings you would like to see here.</p>
+              <section class="settings-section">
+                <header class="settings-section-header">
+                  <h3>Display Options</h3>
+                  <p>Adjust contrast and accent colors.</p>
+                </header>
+                <div class="display-group">
+                  <span class="settings-subheading">Mode</span>
+                  <div class="theme-options" role="radiogroup" aria-label="Theme selection">
+                    {themeOptions.map((option) => (
+                      <label
+                        key={option.value}
+                        class="theme-option"
+                        data-selected={session.ui.theme === option.value}
+                      >
+                        <input
+                          type="radio"
+                          name="theme"
+                          value={option.value}
+                          checked={session.ui.theme === option.value}
+                          onChange$={() => handleThemeSelect(option.value)}
+                        />
+                        <span class="option-copy">
+                          <span class="option-title">{option.label}</span>
+                          <span class="option-hint">{option.description}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div class="display-group">
+                  <span class="settings-subheading">Accent</span>
+                  <div class="accent-options" role="radiogroup" aria-label="Accent color selection">
+                    {accentOptions.map((option) => {
+                      const isSelected = session.ui.accent === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          class="accent-chip"
+                          data-accent={option.value}
+                          data-selected={isSelected}
+                          onClick$={() => handleAccentSelect(option.value)}
+                          role="radio"
+                          aria-checked={isSelected}
+                          tabIndex={isSelected ? 0 : -1}
+                        >
+                          <span class="swatch" aria-hidden="true" />
+                          <span class="chip-label">{option.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
             </div>
             <footer>
               <button type="button" onClick$={handleCloseSettings}>

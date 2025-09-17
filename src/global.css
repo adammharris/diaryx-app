@@ -17,8 +17,18 @@
   --editor-code-border: rgba(15, 23, 42, 0.04);
   --code-block-bg: rgba(15, 23, 42, 0.08);
   --inline-code-bg: rgba(148, 163, 184, 0.2);
+  --accent-primary: #6d28d9;
+  --accent-on-primary: #f3f4ff;
+  --accent-surface: color-mix(in srgb, var(--accent-primary) 18%, #ffffff 82%);
+  --accent-ring: color-mix(in srgb, var(--accent-primary) 40%, transparent);
+  --accent-soft: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  --accent-violet: #6d28d9;
+  --accent-blue: #2563eb;
+  --accent-teal: #0f766e;
+  --accent-amber: #b45309;
   --frame-pad-x: env(safe-area-inset-left, 0px);
   --frame-pad-y: env(safe-area-inset-top, 0px);
+  accent-color: var(--accent-primary);
 }
 
 :root[data-theme="dark"] {
@@ -38,6 +48,24 @@
   --editor-code-border: rgba(148, 163, 184, 0.22);
   --code-block-bg: rgba(15, 23, 42, 0.75);
   --inline-code-bg: rgba(148, 163, 184, 0.28);
+  --accent-on-primary: #f8fafc;
+  --accent-surface: color-mix(in srgb, var(--accent-primary) 20%, #0f172a 80%);
+}
+
+:root[data-accent="violet"] {
+  --accent-primary: var(--accent-violet);
+}
+
+:root[data-accent="blue"] {
+  --accent-primary: var(--accent-blue);
+}
+
+:root[data-accent="teal"] {
+  --accent-primary: var(--accent-teal);
+}
+
+:root[data-accent="amber"] {
+  --accent-primary: var(--accent-amber);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -76,6 +104,11 @@ body {
   box-sizing: border-box;
   padding: 0;
   overflow: hidden;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent-primary);
 }
 
 .app-shell {
@@ -134,55 +167,58 @@ body {
   color: inherit;
   font-size: 0.95rem;
   outline: none;
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+
+.note-list .search-input:focus {
+  background: var(--accent-surface);
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
 .note-list header .actions button,
 .note-list header .actions .export-select {
   width: 100%;
-}
-
-.note-list header .actions button {
-  border: none;
   border-radius: 14px;
-  background: var(--surface-glass);
-  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 25%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent-primary);
   padding: 0.5rem 0.9rem;
   font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .note-list header .actions .export-select {
-  border: none;
-  border-radius: 14px;
-  background: var(--surface-glass);
-  color: var(--text-primary);
-  padding: 0.5rem 0.9rem;
-  font-size: 0.85rem;
-  cursor: pointer;
   appearance: none;
-  transition: background 160ms ease;
 }
 
-.note-list header .actions .export-select:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--focus-ring);
-}
-
+.note-list header .actions button:hover:not(:disabled),
 .note-list header .actions .export-select:hover:not(:disabled) {
-  background: var(--surface-glass-strong);
+  background: var(--accent-surface);
+  border-color: color-mix(in srgb, var(--accent-primary) 45%, transparent);
 }
 
-.note-list header .actions button:disabled {
-  opacity: 0.5;
+.note-list header .actions button:focus-visible,
+.note-list header .actions .export-select:focus-visible {
+  outline: none;
+  background: var(--accent-surface);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.note-list header .actions button:disabled,
+.note-list header .actions .export-select:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
-}
-
-.note-list header .actions button:hover:not(:disabled) {
-  background: var(--surface-glass-strong);
+  filter: grayscale(0.1);
 }
 
 .note-list header .status {
@@ -196,7 +232,7 @@ body {
 }
 
 .note-list header .status.success {
-  color: #16a34a;
+  color: var(--accent-primary);
 }
 
 .sr-only {
@@ -244,10 +280,10 @@ body {
 }
 
 .note-list .settings-dialog header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 0.75rem;
 }
 
 .note-list .settings-dialog h2 {
@@ -263,6 +299,196 @@ body {
   gap: 0.75rem;
 }
 
+.note-list .settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  background: var(--surface-elevated);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  border: 1px solid transparent;
+}
+
+.note-list .settings-section + .settings-section {
+  border-color: var(--surface-border);
+  background: transparent;
+}
+
+.note-list .display-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.note-list .settings-subheading {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.note-list .settings-section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.note-list .settings-section-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.note-list .settings-section-header p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.note-list .theme-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.note-list .accent-options {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.note-list .accent-chip {
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem 0.35rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.note-list .accent-chip[data-selected="true"] {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.note-list .accent-chip:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+}
+
+
+.note-list .accent-chip .swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-swatch);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.note-list .accent-chip[data-accent="violet"] {
+  color: var(--accent-violet, #6d28d9);
+  --accent-swatch: var(--accent-violet, #6d28d9);
+}
+
+.note-list .accent-chip[data-accent="blue"] {
+  color: var(--accent-blue, #2563eb);
+  --accent-swatch: var(--accent-blue, #2563eb);
+}
+
+.note-list .accent-chip[data-accent="teal"] {
+  color: var(--accent-teal, #0f766e);
+  --accent-swatch: var(--accent-teal, #0f766e);
+}
+
+.note-list .accent-chip[data-accent="amber"] {
+  color: var(--accent-amber, #b45309);
+  --accent-swatch: var(--accent-amber, #b45309);
+}
+
+.note-list .accent-chip .chip-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.note-list .theme-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-elevated);
+  cursor: pointer;
+  transition: border 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.note-list .theme-option[data-selected="true"] {
+  border-color: var(--accent-primary);
+  background: var(--accent-surface);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
+}
+
+.note-list .theme-option input {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--accent-primary) 45%, transparent);
+  background: var(--surface-base);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: border 160ms ease, background 160ms ease;
+}
+
+.note-list .theme-option input::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  transform: scale(0);
+  transition: transform 140ms ease;
+}
+
+.note-list .theme-option input:checked::before {
+  transform: scale(1);
+}
+
+.note-list .theme-option input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.note-list .theme-option .option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.note-list .theme-option .option-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.note-list .theme-option[data-selected="true"] .option-title {
+  color: var(--accent-primary);
+}
+
+.note-list .theme-option .option-hint {
+  font-size: 0.78rem;
+}
+
+.note-list .theme-option:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 45%, transparent);
+}
+
 .note-list .settings-dialog footer {
   display: flex;
   justify-content: flex-end;
@@ -271,15 +497,15 @@ body {
 .note-list .settings-dialog footer button {
   border: none;
   border-radius: 12px;
-  background: var(--accent-primary, var(--surface-glass-strong));
-  color: var(--text-on-accent, #0f172a);
+  background: var(--accent-primary);
+  color: var(--accent-on-primary);
   padding: 0.55rem 1.2rem;
   font-size: 0.85rem;
   cursor: pointer;
 }
 
 .note-list .settings-dialog footer button:hover {
-  opacity: 0.9;
+  background: color-mix(in srgb, var(--accent-primary) 88%, #ffffff 12%);
 }
 
 .note-list .settings-dialog .close-button {
@@ -289,6 +515,8 @@ body {
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0.25rem;
+  justify-self: end;
+  align-self: start;
 }
 
 .note-list .settings-dialog .close-button:hover {
@@ -319,13 +547,13 @@ body {
   width: 4px;
   height: 56px;
   border-radius: 999px;
-  background: var(--surface-handle);
+  background: color-mix(in srgb, var(--accent-primary) 20%, var(--surface-handle));
   transition: background 160ms ease, height 160ms ease;
 }
 
 .panel-handle:hover::before,
 .panel-handle:focus-visible::before {
-  background: var(--surface-handle-hover);
+  background: var(--accent-primary);
 }
 
 .panel-handle.collapsed::before {
@@ -334,7 +562,7 @@ body {
 
 .panel-handle:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--surface-handle-hover);
+  box-shadow: inset 0 0 0 2px var(--accent-ring);
 }
 
 .note-list li button {
@@ -349,17 +577,27 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  transition: background 160ms ease, transform 200ms ease;
+  transition:
+    background 160ms ease,
+    transform 200ms ease,
+    box-shadow 160ms ease;
 }
 
 .note-list li button:hover {
-  background: var(--surface-glass);
+  background: var(--accent-soft);
   transform: translateY(-1px);
 }
 
 .note-list li.active button {
-  background: var(--surface-glass-strong);
+  background: var(--accent-surface);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
   font-weight: 600;
+}
+
+.note-list li button:focus-visible {
+  outline: none;
+  background: var(--accent-surface);
+  box-shadow: inset 0 0 0 2px var(--accent-ring);
 }
 
 .note-list .title {
@@ -430,15 +668,19 @@ body {
 
 .note-editor .view-select select {
   appearance: none;
-  border: 1px solid var(--surface-border);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 25%, transparent);
   border-radius: 14px;
   padding: 0.55rem 2.5rem 0.55rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 500;
-  background: var(--surface-elevated);
-  color: var(--text-primary);
+  background: var(--accent-soft);
+  color: var(--accent-primary);
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
   position: relative;
 }
 
@@ -453,13 +695,14 @@ body {
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
-  color: var(--text-secondary);
+  color: var(--accent-primary);
 }
 
 .note-editor .view-select select:focus {
   outline: none;
-  border-color: var(--surface-handle-hover);
-  box-shadow: 0 0 0 2px var(--focus-ring);
+  border-color: var(--accent-primary);
+  background: var(--accent-surface);
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
 .note-editor .editor-panes {
@@ -637,9 +880,10 @@ body {
 .metadata-panel .tabs {
   display: inline-flex;
   gap: 0.5rem;
-  background: var(--surface-glass);
+  background: var(--accent-soft);
   padding: 0.25rem;
   border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 25%, transparent);
 }
 
 .metadata-panel .tabs button {
@@ -650,12 +894,24 @@ body {
   border-radius: 10px;
   cursor: pointer;
   color: var(--text-secondary);
-  transition: background 160ms ease, color 160ms ease;
+  font-weight: 500;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
 .metadata-panel .tabs button.active {
-  background: var(--surface-glass-strong);
-  color: var(--text-primary);
+  background: var(--accent-primary);
+  color: var(--accent-on-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-on-primary) 25%, transparent);
+}
+
+.metadata-panel .tabs button:not(.active):hover {
+  background: var(--accent-surface);
+  color: var(--accent-primary);
+}
+
+.metadata-panel .tabs button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
 .metadata-panel form.details {
@@ -700,6 +956,13 @@ body {
   color: var(--text-primary);
   min-height: 2.4rem;
   outline: none;
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+
+.metadata-panel form.details input:focus,
+.metadata-panel form.details textarea:focus {
+  background: var(--accent-surface);
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
 .metadata-panel .timestamp-field {
@@ -723,7 +986,8 @@ body {
 }
 
 .metadata-panel .auto-update-toggle.active {
-  color: var(--text-primary);
+  color: var(--accent-primary);
+  font-weight: 600;
 }
 
 .metadata-panel form.details textarea {
@@ -738,11 +1002,25 @@ body {
   padding: 0.75rem 0.9rem;
   border-radius: 16px;
   background: var(--surface-glass);
+  transition: background 160ms ease, box-shadow 160ms ease;
 }
 
 .metadata-panel form.details label.checkbox span {
   font-size: 0.9rem;
   color: var(--text-primary);
+}
+
+.metadata-panel form.details label.checkbox:has(input:checked) {
+  background: var(--accent-surface);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
+}
+
+.metadata-panel form.details label.checkbox input,
+.metadata-panel .auto-update-toggle input {
+  accent-color: var(--accent-primary);
+  width: 18px;
+  height: 18px;
+  margin: 0;
 }
 
 .metadata-panel .raw-editor {
@@ -790,7 +1068,7 @@ body {
 .metadata-panel .additional-properties header h3 {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--accent-primary);
 }
 
 .metadata-panel .additional-properties header p {
@@ -865,6 +1143,19 @@ body {
   height: 100%;
 }
 
+.cm-editor .cm-selectionBackground,
+.cm-editor .cm-content ::selection {
+  background: color-mix(in srgb, var(--accent-primary) 28%, transparent) !important;
+}
+
+.cm-editor .cm-activeLine {
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+}
+
+.cm-editor .cm-cursor {
+  border-left-color: var(--accent-primary);
+}
+
 .note-editor[data-mode="live"] .cm-header {
   font-family: "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", system-ui,
     sans-serif;
@@ -926,4 +1217,8 @@ body {
 
 .editor-pane.live .cm-scroller {
   background: transparent;
+}
+.note-list .accent-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }

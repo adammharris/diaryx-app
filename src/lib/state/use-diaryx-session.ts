@@ -13,6 +13,7 @@ const createInitialState = (): DiaryxSessionState => {
     },
   ui: {
     theme: "system",
+    accent: "violet",
     leftPanelWidth: 260,
     rightPanelWidth: 300,
     showLibrary: true,

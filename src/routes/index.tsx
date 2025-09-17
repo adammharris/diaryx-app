@@ -5,6 +5,11 @@ import { NoteEditor } from "../components/note-editor";
 import { NoteList } from "../components/note-list";
 import { createDiaryxRepository } from "../lib/persistence/diaryx-repository";
 import { useDiaryxSessionProvider } from "../lib/state/use-diaryx-session";
+import type { ThemePreference, ColorAccent } from "../lib/state/diaryx-context";
+
+const ACCENT_VALUES: readonly ColorAccent[] = ["violet", "blue", "teal", "amber"];
+const isValidAccent = (value: string | null): value is ColorAccent =>
+  value !== null && ACCENT_VALUES.includes(value as ColorAccent);
 
 const HANDLE_WIDTH = 16;
 const MIN_EDITOR_WIDTH = 420;
@@ -156,6 +161,51 @@ export default component$(() => {
       session.ui.rightPanelWidth = 0;
     }
     clampWidths();
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(() => {
+    if (typeof window === "undefined") return;
+    const storedTheme = window.localStorage.getItem("diaryx.theme") as
+      | ThemePreference
+      | null;
+    if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system") {
+      session.ui.theme = storedTheme;
+    }
+    const storedAccent = window.localStorage.getItem("diaryx.accent");
+    if (isValidAccent(storedAccent)) {
+      session.ui.accent = storedAccent;
+    }
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track }) => {
+    track(() => session.ui.theme);
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    const theme = session.ui.theme;
+    if (theme === "system") {
+      root.removeAttribute("data-theme");
+      root.style.removeProperty("color-scheme");
+    } else {
+      root.setAttribute("data-theme", theme);
+      root.style.colorScheme = theme;
+    }
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("diaryx.theme", theme);
+    }
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track }) => {
+    track(() => session.ui.accent);
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    const accent = session.ui.accent;
+    root.setAttribute("data-accent", accent);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("diaryx.accent", accent);
+    }
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task

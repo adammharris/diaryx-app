@@ -2,9 +2,11 @@ import { createContextId } from "@builder.io/qwik";
 import type { DiaryxNote } from "../diaryx/types";
 
 export type ThemePreference = "system" | "light" | "dark";
+export type ColorAccent = "violet" | "blue" | "teal" | "amber";
 
 export interface DiaryxUiState {
   theme: ThemePreference;
+  accent: ColorAccent;
   leftPanelWidth: number;
   rightPanelWidth: number;
   showMetadata: boolean;
