@@ -42,7 +42,7 @@ export const listNotesForUser = async (userId: string) => {
     `SELECT id, markdown, source_name, last_modified
        FROM diaryx_note
       WHERE user_id = $1
-      ORDER BY updated_at DESC` ,
+      ORDER BY last_modified DESC, updated_at DESC` ,
     [userId]
   );
   return result.rows;

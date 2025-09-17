@@ -39,6 +39,7 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
   if (typeof fetch === "undefined") return;
 
   const payload = session.notes.map(buildPayload);
+  const localMarkdownById = new Map(payload.map((entry) => [entry.id, entry.markdown]));
 
   const response = await fetch("/api/notes", {
     method: "POST",
@@ -60,16 +61,24 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
 
   const data = (await response.json()) as { notes?: RemoteNotePayload[] };
   const remoteNotes = Array.isArray(data.notes) ? data.notes : [];
-
   const parsed: DiaryxNote[] = [];
+  const remoteMarkdownById = new Map<string, string>();
   for (const remote of remoteNotes) {
     const note = parseRemoteNote(remote);
-    if (note) parsed.push(note);
+    if (note) {
+      parsed.push(note);
+      if (remote.id) {
+        remoteMarkdownById.set(remote.id, remote.markdown);
+      }
+    }
   }
 
   const repo = createDiaryxRepository();
 
   if (!parsed.length) {
+    if (!session.notes.length) {
+      return;
+    }
     session.notes.splice(0, session.notes.length);
     session.activeNoteId = undefined;
     persistMarkdownNotes([]);
@@ -77,12 +86,51 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
     return;
   }
 
-  session.notes.splice(0, session.notes.length, ...parsed);
-  if (!session.activeNoteId || !parsed.find((note) => note.id === session.activeNoteId)) {
-    session.activeNoteId = parsed[0].id;
+  parsed.sort((a, b) => {
+    const diff = (b.lastModified ?? 0) - (a.lastModified ?? 0);
+    if (diff !== 0) return diff;
+    return a.id.localeCompare(b.id);
+  });
+
+  const existingMap = new Map(session.notes.map((note) => [note.id, note]));
+  let hasChanges = session.notes.length !== parsed.length;
+
+  const nextNotes: DiaryxNote[] = parsed.map((remoteNote) => {
+    const existing = existingMap.get(remoteNote.id);
+    if (!existing) {
+      hasChanges = true;
+      return remoteNote;
+    }
+
+    const localMarkdown = localMarkdownById.get(remoteNote.id);
+    const remoteMarkdown = remoteMarkdownById.get(remoteNote.id);
+    const sameMarkdown = localMarkdown === remoteMarkdown;
+    const sameModified = existing.lastModified === remoteNote.lastModified;
+
+    if (sameMarkdown && sameModified) {
+      return existing;
+    }
+
+    hasChanges = true;
+    existing.body = remoteNote.body;
+    existing.metadata = remoteNote.metadata;
+    existing.frontmatter = remoteNote.frontmatter;
+    existing.autoUpdateTimestamp = remoteNote.autoUpdateTimestamp;
+    existing.lastModified = remoteNote.lastModified;
+    existing.sourceName = remoteNote.sourceName;
+    return existing;
+  });
+
+  if (!hasChanges) {
+    return;
   }
 
-  persistMarkdownNotes(parsed);
+  session.notes.splice(0, session.notes.length, ...nextNotes);
+  if (!session.activeNoteId || !nextNotes.find((note) => note.id === session.activeNoteId)) {
+    session.activeNoteId = nextNotes[0].id;
+  }
+
+  persistMarkdownNotes(nextNotes);
   await repo.clear();
-  await Promise.all(parsed.map((note) => repo.save(note)));
+  await Promise.all(nextNotes.map((note) => repo.save(note)));
 };
