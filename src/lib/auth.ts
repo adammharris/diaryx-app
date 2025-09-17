@@ -18,3 +18,5 @@ export const auth = betterAuth({
     enabled: true,
   },
 });
+
+export const dbPool = pool;

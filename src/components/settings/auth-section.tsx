@@ -1,5 +1,7 @@
 import { component$, useSignal, $, useVisibleTask$ } from "@builder.io/qwik";
 import { authClient } from "~/lib/auth-client";
+import { useDiaryxSession } from "~/lib/state/use-diaryx-session";
+import { syncNotesWithServer } from "~/lib/sync/note-sync";
 
 export const AuthSection = component$(() => {
   const formState = useSignal<"sign-in" | "sign-up">("sign-in");
@@ -12,6 +14,7 @@ export const AuthSection = component$(() => {
   const successMessage = useSignal<string | null>(null);
   const sessionStore = authClient.useSession;
   const session = useSignal(sessionStore.get());
+  const diaryxSession = useDiaryxSession();
 
   useVisibleTask$(() => {
     session.value = sessionStore.get();
@@ -52,12 +55,18 @@ export const AuthSection = component$(() => {
           onError: (ctx) => {
             errorMessage.value = ctx.error?.message ?? "Unable to sign up.";
           },
-          onSuccess: () => {
-            successMessage.value = "Account created! You're signed in.";
+          onSuccess: async () => {
             name.value = "";
             email.value = "";
             password.value = "";
             confirmPassword.value = "";
+            try {
+              await syncNotesWithServer(diaryxSession);
+              successMessage.value = "Account created! Notes synced.";
+            } catch (error) {
+              errorMessage.value =
+                error instanceof Error ? error.message : "Unable to sync notes.";
+            }
           },
         }
       );
@@ -87,9 +96,15 @@ export const AuthSection = component$(() => {
           onError: (ctx) => {
             errorMessage.value = ctx.error?.message ?? "Invalid credentials.";
           },
-          onSuccess: () => {
-            successMessage.value = "Signed in successfully.";
+          onSuccess: async () => {
             password.value = "";
+            try {
+              await syncNotesWithServer(diaryxSession);
+              successMessage.value = "Signed in and synced.";
+            } catch (error) {
+              errorMessage.value =
+                error instanceof Error ? error.message : "Unable to sync notes.";
+            }
           },
         }
       );

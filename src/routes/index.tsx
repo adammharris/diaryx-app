@@ -3,6 +3,7 @@ import type { DocumentHead } from "@builder.io/qwik-city";
 import { MetadataPanel } from "../components/metadata-panel";
 import { NoteEditor } from "../components/note-editor";
 import { NoteList } from "../components/note-list";
+import { authClient } from "../lib/auth-client";
 import { createDiaryxRepository } from "../lib/persistence/diaryx-repository";
 import {
   loadMarkdownNotes,
@@ -11,6 +12,7 @@ import {
 } from "../lib/persistence/markdown-store";
 import { useDiaryxSessionProvider } from "../lib/state/use-diaryx-session";
 import type { ThemePreference, ColorAccent } from "../lib/state/diaryx-context";
+import { syncNotesWithServer } from "../lib/sync/note-sync";
 
 const ACCENT_VALUES: readonly ColorAccent[] = ["violet", "blue", "teal", "amber"];
 const isValidAccent = (value: string | null): value is ColorAccent =>
@@ -25,6 +27,11 @@ export default component$(() => {
   const session = useDiaryxSessionProvider();
   const shellRef = useSignal<HTMLDivElement>();
   const notesHydrated = useSignal(false);
+  const authSessionStore = authClient.useSession;
+  const currentUserId = useSignal<string | null>(
+    authSessionStore.get()?.data?.user?.id ?? null
+  );
+  const isSyncing = useSignal(false);
 
   const clampWidths = $(
     () => {
@@ -229,6 +236,17 @@ export default component$(() => {
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(() => {
+    const unsubscribe = authSessionStore.subscribe((value) => {
+      const userId = value?.data?.user?.id ?? null;
+      if (currentUserId.value !== userId) {
+        currentUserId.value = userId;
+      }
+    });
+    return () => unsubscribe();
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(async ({ track }) => {
     track(() => session.notes.length);
     track(() => session.notes.map((note) => note.lastModified));
@@ -240,6 +258,34 @@ export default component$(() => {
     persistMarkdownNotes(session.notes);
     const repo = createDiaryxRepository();
     await Promise.all(session.notes.map((note) => repo.save(note)));
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track, cleanup }) => {
+    track(() => session.notes.length);
+    track(() => session.notes.map((note) => note.lastModified));
+    track(() => currentUserId.value);
+    if (!notesHydrated.value) return;
+    const userId = currentUserId.value;
+    if (!userId) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      if (cancelled) return;
+      try {
+        isSyncing.value = true;
+        await syncNotesWithServer(session);
+      } catch (error) {
+        console.warn("Note sync failed", error);
+      } finally {
+        isSyncing.value = false;
+      }
+    }, 750);
+
+    cleanup(() => {
+      cancelled = true;
+      clearTimeout(timer);
+    });
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task
