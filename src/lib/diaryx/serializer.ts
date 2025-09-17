@@ -1,5 +1,6 @@
 import yaml from "js-yaml";
 import MarkdownIt from "markdown-it";
+import { hasMetadataContent } from "./metadata-utils";
 import type {
   DiaryxHtmlExportOptions,
   DiaryxNote,
@@ -30,7 +31,19 @@ export const stringifyDiaryxNote = (
     return note.body;
   }
 
+  const existingFrontmatter = note.frontmatter?.trim();
+  if (existingFrontmatter) {
+    return `---\n${existingFrontmatter}\n---\n\n${note.body}`;
+  }
+
+  if (!hasMetadataContent(note.metadata)) {
+    return note.body;
+  }
+
   const yamlString = toYaml(note.metadata);
+  if (!yamlString) {
+    return note.body;
+  }
   const fmWrapped = `---\n${yamlString}\n---\n\n`;
   return `${fmWrapped}${note.body}`;
 };
@@ -47,6 +60,11 @@ const formatMetadataValue = (value: unknown): string => {
   }
   return String(value);
 };
+
+export const exportDiaryxNoteToMarkdown = (
+  note: DiaryxNote,
+  options: DiaryxSerializeOptions = {}
+): string => stringifyDiaryxNote(note, options);
 
 export const exportDiaryxNoteToHtml = (
   note: DiaryxNote,

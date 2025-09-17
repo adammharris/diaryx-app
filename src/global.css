@@ -141,6 +141,27 @@ body {
   transition: background 160ms ease;
 }
 
+.note-list header .actions .export-select {
+  border: none;
+  border-radius: 14px;
+  background: var(--surface-glass);
+  color: var(--text-primary);
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  appearance: none;
+  transition: background 160ms ease;
+}
+
+.note-list header .actions .export-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.note-list header .actions .export-select:hover:not(:disabled) {
+  background: var(--surface-glass-strong);
+}
+
 .note-list header .actions button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -404,6 +425,7 @@ body {
 .note-editor .preview-pane {
   border-left: 1px solid var(--surface-border);
   background: var(--surface-elevated);
+  line-height: 1.65;
 }
 
 .note-editor[data-mode="source"] .preview-pane,
@@ -426,6 +448,10 @@ body {
   margin-top: 0;
 }
 
+.note-editor .preview-pane :where(p, li, blockquote) {
+  line-height: 1.65;
+}
+
 .note-editor .preview-pane h1,
 .note-editor .preview-pane h2,
 .note-editor .preview-pane h3,
@@ -443,37 +469,37 @@ body {
 .note-editor .preview-pane h1 {
   font-size: 2.4rem;
   line-height: 1.1;
-  margin-bottom: 0.08rem;
+  margin-bottom: 0.6rem;
 }
 
 .note-editor .preview-pane h2 {
   font-size: 1.9rem;
   line-height: 1.12;
-  margin-bottom: 0.08rem;
+  margin-bottom: 0.55rem;
 }
 
 .note-editor .preview-pane h3 {
   font-size: 1.5rem;
   line-height: 1.15;
-  margin-bottom: 0.06rem;
+  margin-bottom: 0.5rem;
 }
 
 .note-editor .preview-pane h4 {
   font-size: 1.3rem;
   line-height: 1.2;
-  margin-bottom: 0.06rem;
+  margin-bottom: 0.45rem;
 }
 
 .note-editor .preview-pane h5 {
   font-size: 1.2rem;
   font-weight: 600;
-  margin-bottom: 0.05rem;
+  margin-bottom: 0.4rem;
 }
 
 .note-editor .preview-pane h6 {
   font-size: 1.1rem;
   font-weight: 600;
-  margin-bottom: 0.05rem;
+  margin-bottom: 0.35rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }

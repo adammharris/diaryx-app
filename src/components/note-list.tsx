@@ -1,5 +1,8 @@
 import { component$, $, useSignal } from "@builder.io/qwik";
-import { exportDiaryxNoteToHtml } from "../lib/diaryx/serializer";
+import {
+  exportDiaryxNoteToHtml,
+  exportDiaryxNoteToMarkdown,
+} from "../lib/diaryx/serializer";
 import { createBlankNote } from "../lib/diaryx/sample";
 import { parseDiaryxFile, DiaryxParseError } from "../lib/diaryx/parser";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
@@ -8,6 +11,7 @@ export const NoteList = component$(() => {
   const session = useDiaryxSession();
   const querySignal = useSignal(session.filters.query);
   const fileInputSignal = useSignal<HTMLInputElement>();
+  const exportFormatSignal = useSignal("");
 
   const handleSelect = $((noteId: string) => {
     session.activeNoteId = noteId;
@@ -19,21 +23,42 @@ export const NoteList = component$(() => {
     session.activeNoteId = newNote.id;
   });
 
-  const handleExportActive = $(() => {
+  const handleExportActive = $(async (format: "html" | "markdown") => {
     const note = session.notes.find((item) => item.id === session.activeNoteId);
     if (!note) return;
     session.exportState.isExporting = true;
-    const html = exportDiaryxNoteToHtml(note);
-    const blob = new Blob([html], { type: "text/html" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `${note.metadata.title.replace(/\s+/g, "-").toLowerCase()}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-    session.exportState.lastSuccessAt = Date.now();
-    session.exportState.isExporting = false;
+    try {
+      const slug = note.metadata.title.replace(/\s+/g, "-").toLowerCase();
+      const timestamp = Date.now();
+      let filename = slug || "diaryx-note";
+      let blob: Blob;
+      if (format === "markdown") {
+        const markdown = exportDiaryxNoteToMarkdown(note, { includeFrontmatter: true });
+        blob = new Blob([markdown], { type: "text/markdown" });
+        filename = `${filename}-${timestamp}.md`;
+      } else {
+        const html = exportDiaryxNoteToHtml(note);
+        blob = new Blob([html], { type: "text/html" });
+        filename = `${filename}-${timestamp}.html`;
+      }
+
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      session.exportState.lastSuccessAt = Date.now();
+    } finally {
+      session.exportState.isExporting = false;
+    }
+  });
+
+  const handleExportChange = $(async (format: "html" | "markdown") => {
+    exportFormatSignal.value = format;
+    await handleExportActive(format);
+    exportFormatSignal.value = "";
   });
 
   const handleImport = $(async (files: FileList | null) => {
@@ -91,13 +116,24 @@ export const NoteList = component$(() => {
           >
             Import
           </button>
-          <button
-            type="button"
-            onClick$={handleExportActive}
+          <select
+            aria-label="Export note"
+            class="export-select"
+            value={exportFormatSignal.value}
             disabled={!session.activeNoteId}
+            onChange$={(event) => {
+              const target = event.target as HTMLSelectElement;
+              const value = target.value as "" | "html" | "markdown";
+              if (!value) return;
+              handleExportChange(value);
+            }}
           >
-            Export
-          </button>
+            <option value="" disabled>
+              Export…
+            </option>
+            <option value="html">Export HTML</option>
+            <option value="markdown">Export Markdown</option>
+          </select>
         </div>
         <input
           aria-label="Search notes"

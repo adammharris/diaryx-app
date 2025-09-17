@@ -38,7 +38,7 @@ const ensureStringOrArray = (value: unknown): string | string[] => {
   return ensureString(value);
 };
 
-const isValuePresent = (value: unknown): boolean => {
+export const isValuePresent = (value: unknown): boolean => {
   if (value == null) {
     return false;
   }
@@ -102,3 +102,11 @@ export const describeIssues = (
   }
   return Array.from(unique.values()).join("; ");
 };
+
+export const hasMetadataContent = (metadata: DiaryxMetadata): boolean =>
+  Object.entries(metadata).some(([key, value]) => {
+    if ((REQUIRED_FIELDS as string[]).includes(key)) {
+      return isValuePresent(value);
+    }
+    return value !== undefined && value !== null && isValuePresent(value);
+  });
