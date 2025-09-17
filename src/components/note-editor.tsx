@@ -87,6 +87,9 @@ export const NoteEditor = component$(() => {
               value={markdownSignal.value}
               variant={isLivePreview ? "live" : "default"}
               onChange$={(next: string) => {
+                if (note.body === next) {
+                  return;
+                }
                 markdownSignal.value = next;
                 note.body = next;
                 stampNoteUpdated(note);
