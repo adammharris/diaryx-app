@@ -149,6 +149,7 @@ input[type="radio"] {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  align-items: flex-start;
 }
 
 .note-list header .actions {
@@ -156,10 +157,11 @@ input[type="radio"] {
   gap: 0.5rem;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   grid-auto-rows: 1fr;
+  width: min(100%, 360px);
 }
 
 .note-list .search-input {
-  width: 100%;
+  width: min(100%, 360px);
   border: none;
   border-radius: 16px;
   padding: 0.75rem 1rem;
@@ -180,8 +182,8 @@ input[type="radio"] {
   width: 100%;
   border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--accent-primary) 25%, transparent);
-  background: var(--accent-soft);
-  color: var(--accent-primary);
+  background: var(--accent-surface);
+  color: var(--text-primary);
   padding: 0.5rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 500;
@@ -202,15 +204,17 @@ input[type="radio"] {
 
 .note-list header .actions button:hover:not(:disabled),
 .note-list header .actions .export-select:hover:not(:disabled) {
-  background: var(--accent-surface);
-  border-color: color-mix(in srgb, var(--accent-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 88%, #ffffff 12%);
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+  color: var(--accent-on-primary);
 }
 
 .note-list header .actions button:focus-visible,
 .note-list header .actions .export-select:focus-visible {
   outline: none;
-  background: var(--accent-surface);
-  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 88%, #ffffff 12%);
+  border-color: color-mix(in srgb, var(--accent-primary) 60%, transparent);
+  color: var(--accent-on-primary);
   box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
@@ -225,6 +229,7 @@ input[type="radio"] {
   margin: 0;
   font-size: 0.78rem;
   color: var(--text-secondary);
+  width: min(100%, 360px);
 }
 
 .note-list header .status.error {
@@ -673,8 +678,8 @@ input[type="radio"] {
   padding: 0.55rem 2.5rem 0.55rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 500;
-  background: var(--accent-soft);
-  color: var(--accent-primary);
+  background: var(--accent-surface);
+  color: var(--text-primary);
   cursor: pointer;
   transition:
     border-color 120ms ease,
@@ -700,8 +705,9 @@ input[type="radio"] {
 
 .note-editor .view-select select:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  background: var(--accent-surface);
+  border-color: color-mix(in srgb, var(--accent-primary) 60%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 88%, #ffffff 12%);
+  color: var(--accent-on-primary);
   box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
