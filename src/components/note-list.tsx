@@ -20,6 +20,8 @@ export const NoteList = component$(() => {
   const querySignal = useSignal(session.filters.query);
   const fileInputSignal = useSignal<HTMLInputElement>();
   const exportFormatSignal = useSignal("");
+  const accountSectionOpen = useSignal(false);
+  const displaySectionOpen = useSignal(false);
 
   const themeOptions: ReadonlyArray<{
     value: ThemePreference;
@@ -278,69 +280,91 @@ export const NoteList = component$(() => {
               </button>
             </header>
             <div class="settings-content" id="settings-dialog-description">
-              <section class="settings-section">
-                <header class="settings-section-header">
-                  <h3>Account</h3>
-                  <p>Sign in to sync your notes across devices.</p>
-                </header>
-                <div class="auth-section">
-                  <AuthSection />
-                </div>
-              </section>
-              <section class="settings-section">
-                <header class="settings-section-header">
-                  <h3>Display Options</h3>
-                  <p>Adjust contrast and accent colors.</p>
-                </header>
-                <div class="display-group">
-                  <span class="settings-subheading">Mode</span>
-                  <div class="theme-options" role="radiogroup" aria-label="Theme selection">
-                    {themeOptions.map((option) => (
-                      <label
-                        key={option.value}
-                        class="theme-option"
-                        data-selected={session.ui.theme === option.value}
-                      >
-                        <input
-                          type="radio"
-                          name="theme"
-                          value={option.value}
-                          checked={session.ui.theme === option.value}
-                          onChange$={() => handleThemeSelect(option.value)}
-                        />
-                        <span class="option-copy">
-                          <span class="option-title">{option.label}</span>
-                          <span class="option-hint">{option.description}</span>
-                        </span>
-                      </label>
-                    ))}
+              <details
+                class="settings-section"
+                open={accountSectionOpen.value}
+                onToggle$={(event) => {
+                  accountSectionOpen.value = (event.target as HTMLDetailsElement).open;
+                }}
+              >
+                <summary class="settings-section-summary">
+                  <div>
+                    <h3>Account</h3>
+                    <p>Sign in to sync your notes across devices.</p>
+                  </div>
+                  <span aria-hidden="true" class="summary-indicator" />
+                </summary>
+                <div class="settings-section-body">
+                  <div class="auth-section">
+                    <AuthSection />
                   </div>
                 </div>
-                <div class="display-group">
-                  <span class="settings-subheading">Accent</span>
-                  <div class="accent-options" role="radiogroup" aria-label="Accent color selection">
-                    {accentOptions.map((option) => {
-                      const isSelected = session.ui.accent === option.value;
-                      return (
-                        <button
+              </details>
+              <details
+                class="settings-section"
+                open={displaySectionOpen.value}
+                onToggle$={(event) => {
+                  displaySectionOpen.value = (event.target as HTMLDetailsElement).open;
+                }}
+              >
+                <summary class="settings-section-summary">
+                  <div>
+                    <h3>Display Options</h3>
+                    <p>Adjust contrast and accent colors.</p>
+                  </div>
+                  <span aria-hidden="true" class="summary-indicator" />
+                </summary>
+                <div class="settings-section-body">
+                  <div class="display-group">
+                    <span class="settings-subheading">Mode</span>
+                    <div class="theme-options" role="radiogroup" aria-label="Theme selection">
+                      {themeOptions.map((option) => (
+                        <label
                           key={option.value}
-                          type="button"
-                          class="accent-chip"
-                          data-accent={option.value}
-                          data-selected={isSelected}
-                          onClick$={() => handleAccentSelect(option.value)}
-                          role="radio"
-                          aria-checked={isSelected}
-                          tabIndex={isSelected ? 0 : -1}
+                          class="theme-option"
+                          data-selected={session.ui.theme === option.value}
                         >
-                          <span class="swatch" aria-hidden="true" />
-                          <span class="chip-label">{option.label}</span>
-                        </button>
-                      );
-                    })}
+                          <input
+                            type="radio"
+                            name="theme"
+                            value={option.value}
+                            checked={session.ui.theme === option.value}
+                            onChange$={() => handleThemeSelect(option.value)}
+                          />
+                          <span class="option-copy">
+                            <span class="option-title">{option.label}</span>
+                            <span class="option-hint">{option.description}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div class="display-group">
+                    <span class="settings-subheading">Accent</span>
+                    <div class="accent-options" role="radiogroup" aria-label="Accent color selection">
+                      {accentOptions.map((option) => {
+                        const isSelected = session.ui.accent === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            class="accent-chip"
+                            data-accent={option.value}
+                            data-selected={isSelected}
+                            onClick$={() => handleAccentSelect(option.value)}
+                            role="radio"
+                            aria-checked={isSelected}
+                            tabIndex={isSelected ? 0 : -1}
+                          >
+                            <span class="swatch" aria-hidden="true" />
+                            <span class="chip-label">{option.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              </section>
+              </details>
             </div>
             <footer>
               <button type="button" onClick$={handleCloseSettings}>

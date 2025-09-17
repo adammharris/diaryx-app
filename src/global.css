@@ -455,18 +455,81 @@ input[type="radio"] {
 }
 
 .note-list .settings-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  background: var(--surface-elevated);
   border-radius: 14px;
-  padding: 1rem 1.1rem;
-  border: 1px solid transparent;
+  border: 1px solid var(--surface-border);
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+  transition: background 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.note-list .settings-section[open] {
+  background: var(--surface-elevated);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--surface-border));
 }
 
 .note-list .settings-section + .settings-section {
-  border-color: var(--surface-border);
-  background: transparent;
+  margin-top: 0.75rem;
+}
+
+.note-list .settings-section-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.note-list .settings-section-summary::-webkit-details-marker {
+  display: none;
+}
+
+.note-list .settings-section-summary h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.note-list .settings-section-summary p {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+}
+
+.note-list .summary-indicator {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-glass);
+  position: relative;
+}
+
+.note-list .summary-indicator::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 2px solid var(--text-secondary);
+  border-bottom: 2px solid var(--text-secondary);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease;
+}
+
+.note-list .settings-section[open] .summary-indicator::before {
+  transform: rotate(45deg);
+}
+
+.note-list .settings-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0 1.1rem 1.1rem;
 }
 
 .note-list .display-group {
@@ -483,22 +546,7 @@ input[type="radio"] {
   color: var(--text-secondary);
 }
 
-.note-list .settings-section-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
 
-.note-list .settings-section-header h3 {
-  margin: 0;
-  font-size: 1rem;
-  color: var(--text-primary);
-}
-
-.note-list .settings-section-header p {
-  margin: 0;
-  font-size: 0.85rem;
-}
 
 .note-list .theme-options {
   display: flex;

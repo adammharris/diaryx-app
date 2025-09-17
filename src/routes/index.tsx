@@ -4,6 +4,11 @@ import { MetadataPanel } from "../components/metadata-panel";
 import { NoteEditor } from "../components/note-editor";
 import { NoteList } from "../components/note-list";
 import { createDiaryxRepository } from "../lib/persistence/diaryx-repository";
+import {
+  loadMarkdownNotes,
+  persistMarkdownNotes,
+  clearMarkdownNotes,
+} from "../lib/persistence/markdown-store";
 import { useDiaryxSessionProvider } from "../lib/state/use-diaryx-session";
 import type { ThemePreference, ColorAccent } from "../lib/state/diaryx-context";
 
@@ -19,6 +24,7 @@ const SNAP_THRESHOLD = 32;
 export default component$(() => {
   const session = useDiaryxSessionProvider();
   const shellRef = useSignal<HTMLDivElement>();
+  const notesHydrated = useSignal(false);
 
   const clampWidths = $(
     () => {
@@ -211,17 +217,27 @@ export default component$(() => {
   // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(async () => {
     const repo = createDiaryxRepository();
-    const notes = await repo.loadAll();
+    let notes = await repo.loadAll();
+    if (!notes.length) {
+      notes = loadMarkdownNotes();
+    }
     if (notes.length) {
       session.notes.splice(0, session.notes.length, ...notes);
       session.activeNoteId = notes[0]?.id;
     }
+    notesHydrated.value = true;
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(async ({ track }) => {
+    track(() => session.notes.length);
     track(() => session.notes.map((note) => note.lastModified));
-    if (!session.notes.length) return;
+    if (!notesHydrated.value) return;
+    if (!session.notes.length) {
+      clearMarkdownNotes();
+      return;
+    }
+    persistMarkdownNotes(session.notes);
     const repo = createDiaryxRepository();
     await Promise.all(session.notes.map((note) => repo.save(note)));
   });
