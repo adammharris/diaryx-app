@@ -304,6 +304,156 @@ input[type="radio"] {
   gap: 0.75rem;
 }
 
+.note-list .auth-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.note-list .auth-card {
+  background: color-mix(in srgb, var(--surface-elevated) 94%, var(--accent-primary) 6%);
+  border-radius: 18px;
+  border: 1px solid var(--surface-border);
+  padding: 1.25rem;
+  display: grid;
+  gap: 1rem;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.06);
+}
+
+.note-list .auth-card header h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.note-list .auth-card header p {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.note-list .auth-tabs {
+  display: inline-flex;
+  gap: 0.5rem;
+  background: var(--surface-glass);
+  border-radius: 999px;
+  padding: 0.25rem;
+}
+
+.note-list .auth-tabs button {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.note-list .auth-tabs button.active {
+  background: var(--accent-primary);
+  color: var(--accent-on-primary);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-primary) 40%, transparent);
+}
+
+.note-list .auth-tabs button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.note-list .auth-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.note-list .auth-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.note-list .auth-form input {
+  border-radius: 12px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-elevated);
+  padding: 0.65rem 0.75rem;
+  font-size: 0.9rem;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.note-list .auth-form input:focus-visible {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.note-list .auth-form button,
+.note-list .auth-card > button {
+  border: none;
+  border-radius: 14px;
+  padding: 0.65rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  background: var(--accent-primary);
+  color: var(--accent-on-primary);
+  transition: transform 120ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+.note-list .auth-form button:hover:not(:disabled),
+.note-list .auth-card > button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+}
+
+.note-list .auth-form button:disabled,
+.note-list .auth-card > button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.note-list .auth-card .status {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.note-list .auth-card .status.error {
+  color: #dc2626;
+}
+
+.note-list .auth-card .status.success {
+  color: #16a34a;
+}
+
+.note-list .auth-card .user-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.note-list .auth-card .user-info div {
+  background: var(--surface-glass);
+  border-radius: 12px;
+  padding: 0.75rem;
+  border: 1px solid var(--surface-border);
+}
+
+.note-list .auth-card .user-info dt {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.note-list .auth-card .user-info dd {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .note-list .settings-section {
   display: flex;
   flex-direction: column;

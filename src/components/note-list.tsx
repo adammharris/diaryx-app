@@ -13,6 +13,7 @@ import { createBlankNote } from "../lib/diaryx/sample";
 import { parseDiaryxFile, DiaryxParseError } from "../lib/diaryx/parser";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
 import type { ThemePreference, ColorAccent } from "../lib/state/diaryx-context";
+import { AuthSection } from "./settings/auth-section";
 
 export const NoteList = component$(() => {
   const session = useDiaryxSession();
@@ -266,7 +267,7 @@ export const NoteList = component$(() => {
         >
           <div class="settings-dialog">
             <header>
-              <h2 id="settings-dialog-title">Editor Settings</h2>
+              <h2 id="settings-dialog-title">Settings</h2>
               <button
                 type="button"
                 class="close-button"
@@ -277,6 +278,15 @@ export const NoteList = component$(() => {
               </button>
             </header>
             <div class="settings-content" id="settings-dialog-description">
+              <section class="settings-section">
+                <header class="settings-section-header">
+                  <h3>Account</h3>
+                  <p>Sign in to sync your notes across devices.</p>
+                </header>
+                <div class="auth-section">
+                  <AuthSection />
+                </div>
+              </section>
               <section class="settings-section">
                 <header class="settings-section-header">
                   <h3>Display Options</h3>
