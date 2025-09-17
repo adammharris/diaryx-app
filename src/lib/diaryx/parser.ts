@@ -3,6 +3,20 @@ import yaml from "js-yaml";
 import { validateDiaryxMetadata } from "./validation";
 import type { DiaryxParseResult, DiaryxNote } from "./types";
 
+type MinimalBuffer = {
+  from: (input: unknown) => unknown;
+  isBuffer?: (value: unknown) => boolean;
+};
+
+const globalWithBuffer = globalThis as { Buffer?: MinimalBuffer };
+
+if (typeof globalWithBuffer.Buffer === "undefined") {
+  globalWithBuffer.Buffer = {
+    from: (input: unknown) => input,
+    isBuffer: () => false,
+  } satisfies MinimalBuffer;
+}
+
 export class DiaryxParseError extends Error {
   constructor(message: string) {
     super(message);
@@ -32,7 +46,9 @@ export const parseDiaryxString = (
 ): DiaryxParseResult => {
   const parsed = matter(fileContents, {
     engines: {
-      yaml: (s) => (yaml.load(s) as Record<string, unknown>) ?? {},
+      yaml: (s) =>
+        (yaml.load(s, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>) ??
+        {},
     },
     excerpt: false,
   });
@@ -72,4 +88,3 @@ export const parseDiaryxFile = async (
   const text = await file.text();
   return parseDiaryxString(text, { ...options, sourceName: file.name });
 };
-

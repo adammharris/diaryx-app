@@ -52,6 +52,7 @@ export const NoteList = component$(() => {
           if (error instanceof DiaryxParseError) {
             session.importState.lastError = `${file.name}: ${error.message}`;
           } else {
+            console.error("Diaryx import failed", error);
             session.importState.lastError = `${file.name}: unable to import`;
           }
         }
