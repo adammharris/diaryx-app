@@ -91,7 +91,11 @@
     --code-block-bg: rgba(15, 23, 42, 0.75);
     --inline-code-bg: rgba(148, 163, 184, 0.28);
     --accent-on-primary: #f8fafc;
-    --accent-surface: color-mix(in srgb, var(--accent-primary) 20%, #0f172a 80%);
+    --accent-surface: color-mix(
+      in srgb,
+      var(--accent-primary) 20%,
+      #0f172a 80%
+    );
     color-scheme: dark;
   }
 }
@@ -176,7 +180,9 @@ input[type="radio"] {
   color: inherit;
   font-size: 0.95rem;
   outline: none;
-  transition: background 160ms ease, box-shadow 160ms ease;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .note-list .search-input:focus {
@@ -334,7 +340,11 @@ input[type="radio"] {
 }
 
 .note-list .auth-card {
-  background: color-mix(in srgb, var(--surface-elevated) 94%, var(--accent-primary) 6%);
+  background: color-mix(
+    in srgb,
+    var(--surface-elevated) 94%,
+    var(--accent-primary) 6%
+  );
   border-radius: 18px;
   border: 1px solid var(--surface-border);
   padding: 1.25rem;
@@ -371,13 +381,17 @@ input[type="radio"] {
   padding: 0.35rem 0.9rem;
   border-radius: 999px;
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .note-list .auth-tabs button.active {
   background: var(--accent-primary);
   color: var(--accent-on-primary);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-primary) 40%, transparent);
+  box-shadow: 0 6px 18px
+    color-mix(in srgb, var(--accent-primary) 40%, transparent);
 }
 
 .note-list .auth-tabs button:focus-visible {
@@ -403,7 +417,10 @@ input[type="radio"] {
   background: var(--surface-elevated);
   padding: 0.65rem 0.75rem;
   font-size: 0.9rem;
-  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease;
 }
 
 .note-list .auth-form input:focus-visible {
@@ -422,13 +439,17 @@ input[type="radio"] {
   cursor: pointer;
   background: var(--accent-primary);
   color: var(--accent-on-primary);
-  transition: transform 120ms ease, box-shadow 150ms ease, opacity 150ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease;
 }
 
 .note-list .auth-form button:hover:not(:disabled),
 .note-list .auth-card > button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  box-shadow: 0 8px 22px
+    color-mix(in srgb, var(--accent-primary) 35%, transparent);
 }
 
 .note-list .auth-form button:disabled,
@@ -484,13 +505,20 @@ input[type="radio"] {
   background: transparent;
   padding: 0;
   overflow: hidden;
-  transition: background 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
 }
 
 .note-list .settings-section[open] {
   background: var(--surface-elevated);
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
-  border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--surface-border));
+  border-color: color-mix(
+    in srgb,
+    var(--accent-primary) 22%,
+    var(--surface-border)
+  );
 }
 
 .note-list .settings-section + .settings-section {
@@ -570,8 +598,6 @@ input[type="radio"] {
   color: var(--text-secondary);
 }
 
-
-
 .note-list .theme-options {
   display: flex;
   flex-direction: column;
@@ -595,7 +621,10 @@ input[type="radio"] {
   background: var(--surface-elevated);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  transition:
+    border 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .note-list .accent-chip[data-selected="true"] {
@@ -607,7 +636,6 @@ input[type="radio"] {
 .note-list .accent-chip:hover {
   border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
 }
-
 
 .note-list .accent-chip .swatch {
   width: 18px;
@@ -651,7 +679,10 @@ input[type="radio"] {
   border: 1px solid var(--surface-border);
   background: var(--surface-elevated);
   cursor: pointer;
-  transition: border 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  transition:
+    border 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .note-list .theme-option[data-selected="true"] {
@@ -670,7 +701,9 @@ input[type="radio"] {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: border 160ms ease, background 160ms ease;
+  transition:
+    border 160ms ease,
+    background 160ms ease;
 }
 
 .note-list .theme-option input::before {
@@ -774,8 +807,14 @@ input[type="radio"] {
   width: 4px;
   height: 56px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent-primary) 20%, var(--surface-handle));
-  transition: background 160ms ease, height 160ms ease;
+  background: color-mix(
+    in srgb,
+    var(--accent-primary) 20%,
+    var(--surface-handle)
+  );
+  transition:
+    background 160ms ease,
+    height 160ms ease;
 }
 
 .panel-handle:hover::before,
@@ -862,7 +901,10 @@ input[type="radio"] {
   font-size: 1.1rem;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
 }
 
 .note-list li .note-delete:hover {
@@ -967,11 +1009,18 @@ input[type="radio"] {
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
 }
 
 .note-editor .mobile-drawer-toggle:hover {
-  background: color-mix(in srgb, var(--accent-primary) 22%, var(--accent-surface));
+  background: color-mix(
+    in srgb,
+    var(--accent-primary) 22%,
+    var(--accent-surface)
+  );
 }
 
 .note-editor .mobile-drawer-toggle:focus-visible {
@@ -1024,6 +1073,7 @@ input[type="radio"] {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
 }
 
 .note-editor[data-mode="live"] .editor-panes,
@@ -1040,8 +1090,13 @@ input[type="radio"] {
 .note-editor .editor-pane,
 .note-editor .preview-pane {
   padding: 1.5rem;
-  overflow-y: auto;
   min-height: 0;
+}
+
+.note-editor .editor-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .note-editor textarea {
@@ -1090,7 +1145,9 @@ input[type="radio"] {
   border-radius: 18px;
 }
 
-.note-editor .preview-pane :where(h1, h2, h3, h4, h5, h6, p, ul, ol, blockquote) {
+.note-editor
+  .preview-pane
+  :where(h1, h2, h3, h4, h5, h6, p, ul, ol, blockquote) {
   margin-top: 0;
 }
 
@@ -1104,8 +1161,8 @@ input[type="radio"] {
 .note-editor .preview-pane h4,
 .note-editor .preview-pane h5,
 .note-editor .preview-pane h6 {
-  font-family: "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", system-ui,
-    sans-serif;
+  font-family:
+    "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
   font-weight: 700;
   letter-spacing: -0.015em;
   color: inherit;
@@ -1155,14 +1212,14 @@ input[type="radio"] {
   padding: 1rem;
   border-radius: 14px;
   overflow-x: auto;
-  font-family: SFMono-Regular, "JetBrains Mono", ui-monospace, SFMono-Regular,
-    monospace;
+  font-family:
+    SFMono-Regular, "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   font-size: 0.95rem;
 }
 
 .note-editor .preview-pane :where(code) {
-  font-family: SFMono-Regular, "JetBrains Mono", ui-monospace, SFMono-Regular,
-    monospace;
+  font-family:
+    SFMono-Regular, "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   font-size: 0.95rem;
 }
 
@@ -1177,7 +1234,6 @@ input[type="radio"] {
   padding: 0.2rem 0.4rem;
   border-radius: 8px;
 }
-
 
 .metadata-panel header {
   padding: 1.25rem 1.5rem 0;
@@ -1209,13 +1265,17 @@ input[type="radio"] {
   cursor: pointer;
   color: var(--text-secondary);
   font-weight: 500;
-  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .metadata-panel .tabs button.active {
   background: var(--accent-primary);
   color: var(--accent-on-primary);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-on-primary) 25%, transparent);
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--accent-on-primary) 25%, transparent);
 }
 
 .metadata-panel .tabs button:not(.active):hover {
@@ -1291,12 +1351,16 @@ input[type="radio"] {
   align-items: center;
   gap: 0.4rem;
   cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .metadata-panel .visibility-badge[data-active="true"] {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--accent-primary) 15%, transparent);
 }
 
 .metadata-panel .visibility-badge[data-special="true"] {
@@ -1326,7 +1390,9 @@ input[type="radio"] {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
 }
 
 .metadata-panel .visibility-remove:hover,
@@ -1342,7 +1408,10 @@ input[type="radio"] {
   border-radius: 999px;
   padding: 0.35rem 0.9rem;
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
 }
 
 .metadata-panel .visibility-add:hover,
@@ -1523,7 +1592,9 @@ input[type="radio"] {
   color: var(--text-primary);
   min-height: 2.4rem;
   outline: none;
-  transition: background 160ms ease, box-shadow 160ms ease;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .metadata-panel form.details input:focus,
@@ -1569,7 +1640,9 @@ input[type="radio"] {
   padding: 0.75rem 0.9rem;
   border-radius: 16px;
   background: var(--surface-glass);
-  transition: background 160ms ease, box-shadow 160ms ease;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .metadata-panel form.details label.checkbox span {
@@ -1833,12 +1906,17 @@ input[type="radio"] {
     bottom: 0;
     width: min(420px, 90vw);
     max-width: 100vw;
-    background: var(--panel-bg, color-mix(in srgb, var(--surface-elevated) 95%, transparent));
+    background: var(
+      --panel-bg,
+      color-mix(in srgb, var(--surface-elevated) 95%, transparent)
+    );
     backdrop-filter: saturate(140%) blur(12px);
     -webkit-backdrop-filter: saturate(140%) blur(12px);
     z-index: 50;
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
-    transition: transform 220ms cubic-bezier(.2, .8, .2, 1), box-shadow 220ms ease;
+    transition:
+      transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 220ms ease;
     padding-top: calc(env(safe-area-inset-top, 0px));
     padding-bottom: calc(env(safe-area-inset-bottom, 0px));
     overflow: auto;
@@ -1878,16 +1956,25 @@ input[type="radio"] {
   }
 }
 .codemirror-container {
-  height: 100%;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
 
 .cm-editor {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
 
 .cm-editor .cm-selectionBackground,
 .cm-editor .cm-content ::selection {
-  background: color-mix(in srgb, var(--accent-primary) 28%, transparent) !important;
+  background: color-mix(
+    in srgb,
+    var(--accent-primary) 28%,
+    transparent
+  ) !important;
 }
 
 .cm-editor .cm-activeLine {
@@ -1899,8 +1986,8 @@ input[type="radio"] {
 }
 
 .note-editor[data-mode="live"] .cm-header {
-  font-family: "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", system-ui,
-    sans-serif;
+  font-family:
+    "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
   font-weight: 700;
   letter-spacing: -0.015em;
   display: block;
@@ -1955,7 +2042,6 @@ input[type="radio"] {
 .note-editor[data-mode="live"] .cm-header::after {
   content: "";
 }
-
 
 .editor-pane.live .cm-scroller {
   background: transparent;

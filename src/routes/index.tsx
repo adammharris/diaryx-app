@@ -1,4 +1,10 @@
-import { $, component$, useSignal, useVisibleTask$ } from "@builder.io/qwik";
+import {
+  $,
+  component$,
+  useSignal,
+  useTask$,
+  useVisibleTask$,
+} from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
 import { MetadataPanel } from "../components/metadata-panel";
 import { NoteEditor } from "../components/note-editor";
@@ -14,14 +20,21 @@ import { useDiaryxSessionProvider } from "../lib/state/use-diaryx-session";
 import type { ThemePreference, ColorAccent } from "../lib/state/diaryx-context";
 import { syncNotesWithServer } from "../lib/sync/note-sync";
 
-const ACCENT_VALUES: readonly ColorAccent[] = ["violet", "blue", "teal", "amber"];
+const ACCENT_VALUES: readonly ColorAccent[] = [
+  "violet",
+  "blue",
+  "teal",
+  "amber",
+];
 const isValidAccent = (value: string | null): value is ColorAccent =>
   value !== null && ACCENT_VALUES.includes(value as ColorAccent);
 
 const toVisibilityArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
     return value
-      .map((item) => (typeof item === "string" ? item.trim() : String(item).trim()))
+      .map((item) =>
+        typeof item === "string" ? item.trim() : String(item).trim(),
+      )
       .filter(Boolean);
   }
   if (typeof value === "string") {
@@ -44,29 +57,27 @@ export default component$(() => {
   const isSyncing = useSignal(false);
   const isMobile = useSignal(false);
 
-  const clampWidths = $(
-    () => {
-      const shell = shellRef.value;
-      if (!shell) return;
-      const total = shell.getBoundingClientRect().width;
-      const maxLeft = Math.max(
-        0,
-        total - session.ui.rightPanelWidth - MIN_EDITOR_WIDTH - HANDLE_WIDTH * 2
-      );
-      if (session.ui.leftPanelWidth > maxLeft) {
-        session.ui.leftPanelWidth = Math.max(0, maxLeft);
-        session.ui.showLibrary = session.ui.leftPanelWidth > SNAP_THRESHOLD;
-      }
-      const maxRight = Math.max(
-        0,
-        total - session.ui.leftPanelWidth - MIN_EDITOR_WIDTH - HANDLE_WIDTH * 2
-      );
-      if (session.ui.rightPanelWidth > maxRight) {
-        session.ui.rightPanelWidth = Math.max(0, maxRight);
-        session.ui.showMetadata = session.ui.rightPanelWidth > SNAP_THRESHOLD;
-      }
+  const clampWidths = $(() => {
+    const shell = shellRef.value;
+    if (!shell) return;
+    const total = shell.getBoundingClientRect().width;
+    const maxLeft = Math.max(
+      0,
+      total - session.ui.rightPanelWidth - MIN_EDITOR_WIDTH - HANDLE_WIDTH * 2,
+    );
+    if (session.ui.leftPanelWidth > maxLeft) {
+      session.ui.leftPanelWidth = Math.max(0, maxLeft);
+      session.ui.showLibrary = session.ui.leftPanelWidth > SNAP_THRESHOLD;
     }
-  );
+    const maxRight = Math.max(
+      0,
+      total - session.ui.leftPanelWidth - MIN_EDITOR_WIDTH - HANDLE_WIDTH * 2,
+    );
+    if (session.ui.rightPanelWidth > maxRight) {
+      session.ui.rightPanelWidth = Math.max(0, maxRight);
+      session.ui.showMetadata = session.ui.rightPanelWidth > SNAP_THRESHOLD;
+    }
+  });
 
   const beginLeftDrag = $((event: PointerEvent) => {
     const shell = shellRef.value;
@@ -75,7 +86,7 @@ export default component$(() => {
     }
     event.preventDefault();
     (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(
-      event.pointerId
+      event.pointerId,
     );
     const rect = shell.getBoundingClientRect();
     const startX = event.clientX;
@@ -86,7 +97,10 @@ export default component$(() => {
       const delta = moveEvent.clientX - startX;
       const maxWidth = Math.max(
         0,
-        rect.width - session.ui.rightPanelWidth - MIN_EDITOR_WIDTH - HANDLE_WIDTH * 2
+        rect.width -
+          session.ui.rightPanelWidth -
+          MIN_EDITOR_WIDTH -
+          HANDLE_WIDTH * 2,
       );
       let newWidth = startWidth + delta;
       newWidth = Math.min(Math.max(newWidth, 0), maxWidth);
@@ -102,11 +116,14 @@ export default component$(() => {
       } else if (session.ui.leftPanelWidth < MIN_PANEL_WIDTH) {
         const maxWidth = Math.max(
           0,
-          rect.width - session.ui.rightPanelWidth - MIN_EDITOR_WIDTH - HANDLE_WIDTH * 2
+          rect.width -
+            session.ui.rightPanelWidth -
+            MIN_EDITOR_WIDTH -
+            HANDLE_WIDTH * 2,
         );
         session.ui.leftPanelWidth = Math.min(
           Math.max(session.ui.leftPanelWidth, MIN_PANEL_WIDTH),
-          maxWidth
+          maxWidth,
         );
         session.ui.showLibrary = true;
       }
@@ -118,7 +135,7 @@ export default component$(() => {
       () => {
         handleUp();
       },
-      { once: true }
+      { once: true },
     );
   });
 
@@ -129,7 +146,7 @@ export default component$(() => {
     }
     event.preventDefault();
     (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(
-      event.pointerId
+      event.pointerId,
     );
     const rect = shell.getBoundingClientRect();
     const startX = event.clientX;
@@ -140,7 +157,10 @@ export default component$(() => {
       const delta = startX - moveEvent.clientX;
       const maxWidth = Math.max(
         0,
-        rect.width - session.ui.leftPanelWidth - MIN_EDITOR_WIDTH - HANDLE_WIDTH * 2
+        rect.width -
+          session.ui.leftPanelWidth -
+          MIN_EDITOR_WIDTH -
+          HANDLE_WIDTH * 2,
       );
       let newWidth = startWidth + delta;
       newWidth = Math.min(Math.max(newWidth, 0), maxWidth);
@@ -156,11 +176,14 @@ export default component$(() => {
       } else if (session.ui.rightPanelWidth < MIN_PANEL_WIDTH) {
         const maxWidth = Math.max(
           0,
-          rect.width - session.ui.leftPanelWidth - MIN_EDITOR_WIDTH - HANDLE_WIDTH * 2
+          rect.width -
+            session.ui.leftPanelWidth -
+            MIN_EDITOR_WIDTH -
+            HANDLE_WIDTH * 2,
         );
         session.ui.rightPanelWidth = Math.min(
           Math.max(session.ui.rightPanelWidth, MIN_PANEL_WIDTH),
-          maxWidth
+          maxWidth,
         );
         session.ui.showMetadata = true;
       }
@@ -172,12 +195,11 @@ export default component$(() => {
       () => {
         handleUp();
       },
-      { once: true }
+      { once: true },
     );
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(() => {
+  useTask$(() => {
     if (globalThis.window && window.innerWidth < 900) {
       session.ui.showLibrary = false;
       session.ui.leftPanelWidth = 0;
@@ -187,8 +209,7 @@ export default component$(() => {
     clampWidths();
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ cleanup }) => {
+  useTask$(({ cleanup }) => {
     if (typeof window === "undefined") return;
     const media = window.matchMedia("(max-width: 900px)");
     const update = () => {
@@ -204,23 +225,34 @@ export default component$(() => {
     }
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(() => {
+  useTask$(() => {
     if (typeof window === "undefined") return;
-    const storedTheme = window.localStorage.getItem("diaryx.theme") as
-      | ThemePreference
-      | null;
-    if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system") {
+    const storedTheme = window.localStorage.getItem(
+      "diaryx.theme",
+    ) as ThemePreference | null;
+    if (
+      storedTheme === "light" ||
+      storedTheme === "dark" ||
+      storedTheme === "system"
+    ) {
       session.ui.theme = storedTheme;
     }
     const storedAccent = window.localStorage.getItem("diaryx.accent");
     if (isValidAccent(storedAccent)) {
       session.ui.accent = storedAccent;
     }
+    const storedEditorMode = window.localStorage.getItem("diaryx.editorMode");
+    if (
+      storedEditorMode === "split" ||
+      storedEditorMode === "source" ||
+      storedEditorMode === "preview" ||
+      storedEditorMode === "live"
+    ) {
+      session.ui.editorMode = storedEditorMode as typeof session.ui.editorMode;
+    }
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track }) => {
+  useTask$(({ track }) => {
     track(() => session.ui.theme);
     if (typeof document === "undefined") return;
     const root = document.documentElement;
@@ -237,8 +269,7 @@ export default component$(() => {
     }
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track }) => {
+  useTask$(({ track }) => {
     track(() => session.ui.accent);
     if (typeof document === "undefined") return;
     const root = document.documentElement;
@@ -249,22 +280,32 @@ export default component$(() => {
     }
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(async () => {
-    const repo = createDiaryxRepository();
-    let notes = await repo.loadAll();
-    if (!notes.length) {
-      notes = loadMarkdownNotes();
+  useTask$(({ track }) => {
+    track(() => session.ui.editorMode);
+    track(() => session.ui.libraryMode);
+    if (typeof window === "undefined") return;
+    if (session.ui.libraryMode !== "shared") {
+      window.localStorage.setItem("diaryx.editorMode", session.ui.editorMode);
     }
-    if (notes.length) {
-      session.notes.splice(0, session.notes.length, ...notes);
-      session.activeNoteId = notes[0]?.id;
-    }
-    notesHydrated.value = true;
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(async () => {
+  useVisibleTask$(
+    async () => {
+      const repo = createDiaryxRepository();
+      let notes = await repo.loadAll();
+      if (!notes.length) {
+        notes = loadMarkdownNotes();
+      }
+      if (notes.length) {
+        session.notes.splice(0, session.notes.length, ...notes);
+        session.activeNoteId = notes[0]?.id;
+      }
+      notesHydrated.value = true;
+    },
+    { strategy: "document-ready" },
+  );
+
+  useTask$(async () => {
     if (!hasAuthClient()) return;
     const client = await getAuthClient();
     const store = client.useSession;
@@ -280,8 +321,7 @@ export default component$(() => {
     return () => unsubscribe();
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(async ({ track }) => {
+  useTask$(async ({ track }) => {
     track(() => session.notes.length);
     track(() => session.notes.map((note) => note.lastModified));
     if (!notesHydrated.value) return;
@@ -318,12 +358,11 @@ export default component$(() => {
       Array.from(aggregated.entries()).map(([term, emails]) => [
         term,
         Array.from(emails.values()),
-      ])
+      ]),
     );
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track, cleanup }) => {
+  useTask$(({ track, cleanup }) => {
     track(() => session.notes.length);
     track(() => session.notes.map((note) => note.lastModified));
     track(() => currentUserId.value);
@@ -350,8 +389,8 @@ export default component$(() => {
     });
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(() => {
+  useTask$(() => {
+    if (typeof window === "undefined") return;
     const adjust = () => {
       clampWidths();
     };
@@ -360,8 +399,7 @@ export default component$(() => {
     return () => window.removeEventListener("resize", adjust);
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track, cleanup }) => {
+  useTask$(({ track, cleanup }) => {
     track(() => isMobile.value);
     track(() => session.ui.showLibrary);
     track(() => session.ui.showMetadata);
@@ -398,14 +436,19 @@ export default component$(() => {
   const gridTemplate = `${leftWidth}px ${HANDLE_WIDTH}px minmax(${MIN_EDITOR_WIDTH}px, 1fr) ${HANDLE_WIDTH}px ${rightWidth}px`;
 
   const drawerOpen = session.ui.showLibrary || session.ui.showMetadata;
-  const shellStyle = isMobile.value ? undefined : { gridTemplateColumns: gridTemplate };
+  const shellStyle = isMobile.value
+    ? undefined
+    : { gridTemplateColumns: gridTemplate };
 
   return (
     <div class="app-shell" ref={shellRef} style={shellStyle}>
       <NoteList />
       <button
         type="button"
-        class={{ "panel-handle": true, collapsed: session.ui.leftPanelWidth === 0 }}
+        class={{
+          "panel-handle": true,
+          collapsed: session.ui.leftPanelWidth === 0,
+        }}
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize library panel"
@@ -414,7 +457,10 @@ export default component$(() => {
       <NoteEditor />
       <button
         type="button"
-        class={{ "panel-handle": true, collapsed: session.ui.rightPanelWidth === 0 }}
+        class={{
+          "panel-handle": true,
+          collapsed: session.ui.rightPanelWidth === 0,
+        }}
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize info panel"
@@ -440,8 +486,7 @@ export const head: DocumentHead = {
   meta: [
     {
       name: "description",
-      content:
-        "Craft Diaryx-compliant notes with metadata-first workflows inspired by Bear and Liquid Glass.",
+      content: "Craft Diaryx-compliant notes with metadata-first workflows.",
     },
   ],
 };

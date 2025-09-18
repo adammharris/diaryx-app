@@ -1,9 +1,13 @@
-import { component$, useSignal, useTask$, useVisibleTask$ } from "@builder.io/qwik";
+import {
+  component$,
+  useSignal,
+  useTask$,
+  useVisibleTask$,
+} from "@builder.io/qwik";
 import { stampNoteUpdated } from "../lib/diaryx/note-utils";
 import { CodeMirrorEditor } from "./codemirror-editor";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
 import { renderMarkdownToHtml } from "../lib/markdown/renderer";
-
 
 export const NoteEditor = component$(() => {
   const session = useDiaryxSession();
@@ -23,8 +27,11 @@ export const NoteEditor = component$(() => {
     track(() => session.sharedNotes.length);
     const libraryMode = session.ui.libraryMode;
     const activeId =
-      libraryMode === "shared" ? session.sharedActiveNoteId : session.activeNoteId;
-    const collection = libraryMode === "shared" ? session.sharedNotes : session.notes;
+      libraryMode === "shared"
+        ? session.sharedActiveNoteId
+        : session.activeNoteId;
+    const collection =
+      libraryMode === "shared" ? session.sharedNotes : session.notes;
     const note = collection.find((item) => item.id === activeId);
     markdownSignal.value = note?.body ?? "";
     htmlSignal.value = note ? renderMarkdownToHtml(note.body) : "";
@@ -50,39 +57,51 @@ export const NoteEditor = component$(() => {
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track }) => {
-    track(() => session.ui.showLibrary);
-    const wasOpen = libraryWasOpen.value;
-    const isOpen = session.ui.showLibrary;
-    libraryWasOpen.value = isOpen;
-    if (!wasOpen || isOpen) return;
-    if (typeof window === "undefined") return;
-    if (!window.matchMedia("(max-width: 900px)").matches) return;
-    libraryToggleRef.value?.focus();
-  });
+  useVisibleTask$(
+    ({ track }) => {
+      track(() => session.ui.showLibrary);
+      const wasOpen = libraryWasOpen.value;
+      const isOpen = session.ui.showLibrary;
+      libraryWasOpen.value = isOpen;
+      if (!wasOpen || isOpen) return;
+      if (typeof window === "undefined") return;
+      if (!window.matchMedia("(max-width: 900px)").matches) return;
+      libraryToggleRef.value?.focus();
+    },
+    { strategy: "document-ready" },
+  );
 
   // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track }) => {
-    track(() => session.ui.showMetadata);
-    const wasOpen = metadataWasOpen.value;
-    const isOpen = session.ui.showMetadata;
-    metadataWasOpen.value = isOpen;
-    if (!wasOpen || isOpen) return;
-    if (typeof window === "undefined") return;
-    if (!window.matchMedia("(max-width: 900px)").matches) return;
-    metadataToggleRef.value?.focus();
-  });
+  useVisibleTask$(
+    ({ track }) => {
+      track(() => session.ui.showMetadata);
+      const wasOpen = metadataWasOpen.value;
+      const isOpen = session.ui.showMetadata;
+      metadataWasOpen.value = isOpen;
+      if (!wasOpen || isOpen) return;
+      if (typeof window === "undefined") return;
+      if (!window.matchMedia("(max-width: 900px)").matches) return;
+      metadataToggleRef.value?.focus();
+    },
+    { strategy: "document-ready" },
+  );
 
   const libraryMode = session.ui.libraryMode;
   const isSharedView = libraryMode === "shared";
-  const activeId = isSharedView ? session.sharedActiveNoteId : session.activeNoteId;
+  const activeId = isSharedView
+    ? session.sharedActiveNoteId
+    : session.activeNoteId;
   const collection = isSharedView ? session.sharedNotes : session.notes;
   const note = collection.find((item) => item.id === activeId);
 
   if (!activeId) {
     return (
       <section class="note-editor empty">
-        <p>{isSharedView ? "Select a shared note to view." : "Select or create a note to begin."}</p>
+        <p>
+          {isSharedView
+            ? "Select a shared note to view."
+            : "Select or create a note to begin."}
+        </p>
       </section>
     );
   }
@@ -97,10 +116,15 @@ export const NoteEditor = component$(() => {
 
   const isLivePreview = !isSharedView && viewMode.value === "live";
   const showEditorPane = !isSharedView && viewMode.value !== "preview";
-  const showPreviewPane = isSharedView || viewMode.value === "split" || viewMode.value === "preview";
+  const showPreviewPane =
+    isSharedView || viewMode.value === "split" || viewMode.value === "preview";
 
   return (
-    <section class="note-editor" data-mode={viewMode.value} data-shared={isSharedView ? "true" : undefined}>
+    <section
+      class="note-editor"
+      data-mode={viewMode.value}
+      data-shared={isSharedView ? "true" : undefined}
+    >
       <header class="editor-toolbar">
         <div class="editor-summary">
           <span class="note-title" title={note.metadata.title}>

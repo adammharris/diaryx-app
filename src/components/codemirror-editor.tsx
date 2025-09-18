@@ -37,162 +37,263 @@ export const CodeMirrorEditor = component$(
     const isApplyingExternalChange = useSignal(false);
 
     // eslint-disable-next-line qwik/no-use-visible-task
-    useVisibleTask$(async ({ track, cleanup }) => {
-      if (typeof window === "undefined" || typeof document === "undefined") {
-        return;
-      }
-      const parent = track(() => containerRef.value);
-      if (!parent) return;
-      if (editorViewSignal.value) return;
-      // Delay init until container is laid out/visible to avoid zero-height render
-      let attempts = 0;
-      while (attempts < 10) {
-        const rect = parent.getBoundingClientRect?.();
-        const visible =
-          rect &&
-          rect.width > 4 &&
-          rect.height > 4 &&
-          document.body.contains(parent);
-        if (visible) break;
-        await new Promise((r) => requestAnimationFrame(r));
-        attempts++;
-      }
+    useVisibleTask$(
+      async ({ track, cleanup }) => {
+        const parent = track(() => containerRef.value);
+        if (typeof window === "undefined" || typeof document === "undefined") {
+          return;
+        }
+        if (!parent || editorViewSignal.value) {
+          return;
+        }
 
-      const [
-        stateModule,
-        markdownModule,
-        languageModule,
-        commandsModule,
-        viewModule,
-      ] = await Promise.all([
-        import("@codemirror/state"),
-        import("@codemirror/lang-markdown"),
-        import("@codemirror/language"),
-        import("@codemirror/commands"),
-        import("@codemirror/view"),
-      ]);
+        // Wait for container to have measurable size before initializing CodeMirror
+        const waitForSize = (): Promise<void> =>
+          new Promise((resolve) => {
+            const rect = parent.getBoundingClientRect?.();
+            if (rect && rect.width > 4 && rect.height > 4) {
+              resolve();
+              return;
+            }
+            if (typeof ResizeObserver !== "undefined") {
+              const ro = new ResizeObserver((entries) => {
+                const cr =
+                  entries[0]?.contentRect ??
+                  (entries[0]?.target as any)?.getBoundingClientRect?.();
+                if (cr && cr.width > 4 && cr.height > 4) {
+                  ro.disconnect();
+                  resolve();
+                }
+              });
+              ro.observe(parent);
+            } else {
+              let tries = 0;
+              const tick = () => {
+                const r = parent.getBoundingClientRect?.();
+                if (r && r.width > 4 && r.height > 4) {
+                  resolve();
+                  return;
+                }
+                if (tries++ < 60) requestAnimationFrame(tick);
+                else resolve();
+              };
+              requestAnimationFrame(tick);
+            }
+          });
 
-      const { EditorState, Compartment } = stateModule;
-      const { markdown, markdownLanguage, markdownKeymap } = markdownModule;
-      const { syntaxHighlighting, defaultHighlightStyle } = languageModule;
-      const { history, defaultKeymap, historyKeymap } = commandsModule;
-      const { EditorView, keymap } = viewModule;
+        await waitForSize();
 
-      const themeCompartment = new Compartment();
-      const readOnlyCompartment = new Compartment();
-      const editableCompartment = new Compartment();
+        const [
+          stateModule,
+          markdownModule,
+          languageModule,
+          commandsModule,
+          viewModule,
+        ] = await Promise.all([
+          import("@codemirror/state"),
+          import("@codemirror/lang-markdown"),
+          import("@codemirror/language"),
+          import("@codemirror/commands"),
+          import("@codemirror/view"),
+        ]);
 
-      editorStateSignal.value = EditorState;
-      editorViewCtorSignal.value = EditorView;
-      themeCompartmentSignal.value = themeCompartment;
-      readOnlyCompartmentSignal.value = readOnlyCompartment;
-      editableCompartmentSignal.value = editableCompartment;
+        const { EditorState, Compartment } = stateModule;
+        const { markdown, markdownLanguage, markdownKeymap } = markdownModule;
+        const { syntaxHighlighting, defaultHighlightStyle } = languageModule;
+        const { history, defaultKeymap, historyKeymap } = commandsModule;
+        const { EditorView, keymap } = viewModule;
 
-      const baseExtensions = [
-        history(),
-        keymap.of([...defaultKeymap, ...historyKeymap, ...markdownKeymap]),
-        markdown({ base: markdownLanguage }),
-        EditorView.lineWrapping,
-        EditorState.allowMultipleSelections.of(true),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        readOnlyCompartment.of(EditorState.readOnly.of(!!readOnly)),
-        themeCompartment.of(defaultTheme(EditorView)),
-        editableCompartment.of(EditorView.editable.of(!readOnly)),
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged && !isApplyingExternalChange.value) {
-            onChange$(update.state.doc.toString());
-          }
-        }),
-      ];
+        const themeCompartment = new Compartment();
+        const readOnlyCompartment = new Compartment();
+        const editableCompartment = new Compartment();
 
-      const state = EditorState.create({
-        doc: value,
-        extensions: baseExtensions,
-      });
+        editorStateSignal.value = EditorState;
+        editorViewCtorSignal.value = EditorView;
+        themeCompartmentSignal.value = themeCompartment;
+        readOnlyCompartmentSignal.value = readOnlyCompartment;
+        editableCompartmentSignal.value = editableCompartment;
 
-      const view = new EditorView({ state, parent });
-      editorViewSignal.value = view;
-      editorReady.value = true;
-      if (onViewReady$) await onViewReady$(view);
+        const baseExtensions = [
+          history(),
+          keymap.of([...defaultKeymap, ...historyKeymap, ...markdownKeymap]),
+          markdown({ base: markdownLanguage }),
+          EditorView.lineWrapping,
+          EditorState.allowMultipleSelections.of(true),
+          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+          readOnlyCompartment.of(EditorState.readOnly.of(!!readOnly)),
+          themeCompartment.of(defaultTheme(EditorView)),
+          editableCompartment.of(EditorView.editable.of(!readOnly)),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged && !isApplyingExternalChange.value) {
+              onChange$(update.state.doc.toString());
+            }
+          }),
+        ];
 
-      if (variant === "live") {
-        view.dispatch({
-          effects: [themeCompartment.reconfigure(livePreviewTheme(EditorView))],
+        const state = EditorState.create({
+          doc: value,
+          extensions: baseExtensions,
         });
-      }
 
-      cleanup(async () => {
-        editorReady.value = false;
-        editorViewSignal.value = undefined;
-        editorStateSignal.value = undefined;
-        themeCompartmentSignal.value = undefined;
-        readOnlyCompartmentSignal.value = undefined;
-        editableCompartmentSignal.value = undefined;
-        editorViewCtorSignal.value = undefined;
-        view.destroy();
-        if (onDispose$) await onDispose$();
-      });
-    });
+        const view = new EditorView({ state, parent });
+        editorViewSignal.value = view;
+        editorReady.value = true;
+
+        requestAnimationFrame(() => {
+          try {
+            (view as any).requestMeasure?.({
+              read: () => null,
+              write: () => {},
+            });
+          } catch {
+            void 0;
+          }
+        });
+
+        // Keep editor measured when container resizes
+        let __ro: ResizeObserver | undefined;
+        if (typeof ResizeObserver !== "undefined") {
+          __ro = new ResizeObserver(() => {
+            try {
+              (view as any).requestMeasure?.({
+                read: () => null,
+                write: () => {},
+              });
+            } catch {
+              void 0;
+            }
+          });
+          __ro.observe(parent);
+        } else {
+          const onWinResize = () => {
+            try {
+              (view as any).requestMeasure?.({
+                read: () => null,
+                write: () => {},
+              });
+            } catch {
+              void 0;
+            }
+          };
+          window.addEventListener("resize", onWinResize);
+          (view as any).__onWinResize = onWinResize;
+        }
+
+        if (onViewReady$) await onViewReady$(view);
+
+        if (variant === "live") {
+          view.dispatch({
+            effects: [
+              themeCompartment.reconfigure(livePreviewTheme(EditorView)),
+            ],
+          });
+        }
+
+        cleanup(async () => {
+          try {
+            if (typeof __ro !== "undefined") {
+              __ro.disconnect();
+            } else if ((view as any).__onWinResize) {
+              window.removeEventListener("resize", (view as any).__onWinResize);
+            }
+          } catch {
+            void 0;
+          }
+          editorReady.value = false;
+          editorViewSignal.value = undefined;
+          editorStateSignal.value = undefined;
+          themeCompartmentSignal.value = undefined;
+          readOnlyCompartmentSignal.value = undefined;
+          editableCompartmentSignal.value = undefined;
+          editorViewCtorSignal.value = undefined;
+          view.destroy();
+          if (onDispose$) await onDispose$();
+        });
+      },
+      { strategy: "document-ready" },
+    );
 
     // eslint-disable-next-line qwik/no-use-visible-task
-    useVisibleTask$(({ track }) => {
-      const nextValue = track(() => value);
-      const view = editorViewSignal.value;
-      if (!view) return;
-      const current = view.state.doc.toString();
-      if (nextValue === current) return;
-      // Apply external value without losing selection/focus
-      const sel = view.state.selection.main;
-      isApplyingExternalChange.value = true;
-      view.dispatch({
-        changes: { from: 0, to: current.length, insert: nextValue },
-        selection: {
-          anchor: Math.min(sel.anchor, nextValue.length),
-          head: Math.min(sel.head, nextValue.length),
-        },
-        scrollIntoView: true,
-      });
-      isApplyingExternalChange.value = false;
-    });
+    useVisibleTask$(
+      ({ track }) => {
+        const nextValue = track(() => value);
+        if (typeof window === "undefined") {
+          return;
+        }
+        const view = editorViewSignal.value;
+        if (!view) return;
+        const current = view.state.doc.toString();
+        if (nextValue === current) return;
+        // Apply external value without losing selection/focus
+        const sel = view.state.selection.main;
+        isApplyingExternalChange.value = true;
+        view.dispatch({
+          changes: { from: 0, to: current.length, insert: nextValue },
+          selection: {
+            anchor: Math.min(sel.anchor, nextValue.length),
+            head: Math.min(sel.head, nextValue.length),
+          },
+          scrollIntoView: true,
+        });
+        isApplyingExternalChange.value = false;
+      },
+      { strategy: "document-ready" },
+    );
 
     // eslint-disable-next-line qwik/no-use-visible-task
-    useVisibleTask$(({ track }) => {
-      const currentVariant = track(() => variant);
-      const view = editorViewSignal.value;
-      const themeCompartment = themeCompartmentSignal.value;
-      const EditorView = editorViewCtorSignal.value;
-      if (!view || !themeCompartment || !EditorView) return;
-      const theme =
-        currentVariant === "live"
-          ? livePreviewTheme(EditorView)
-          : defaultTheme(EditorView);
-      view.dispatch({ effects: [themeCompartment.reconfigure(theme)] });
-    });
+    useVisibleTask$(
+      ({ track }) => {
+        const currentVariant = track(() => variant);
+        if (typeof window === "undefined") {
+          return;
+        }
+        const view = editorViewSignal.value;
+        const themeCompartment = themeCompartmentSignal.value;
+        const EditorView = editorViewCtorSignal.value;
+        if (!view || !themeCompartment || !EditorView) return;
+        const theme =
+          currentVariant === "live"
+            ? livePreviewTheme(EditorView)
+            : defaultTheme(EditorView);
+        view.dispatch({ effects: [themeCompartment.reconfigure(theme)] });
+      },
+      { strategy: "document-ready" },
+    );
 
     // eslint-disable-next-line qwik/no-use-visible-task
-    useVisibleTask$(({ track }) => {
-      const isReadOnly = !!track(() => readOnly);
-      const view = editorViewSignal.value;
-      const EditorState = editorStateSignal.value;
-      const readOnlyCompartment = readOnlyCompartmentSignal.value;
-      const editableCompartment = editableCompartmentSignal.value;
-      const EditorView = editorViewCtorSignal.value;
-      if (
-        !view ||
-        !EditorState ||
-        !readOnlyCompartment ||
-        !editableCompartment ||
-        !EditorView
-      ) {
-        return;
-      }
-      view.dispatch({
-        effects: [
-          readOnlyCompartment.reconfigure(EditorState.readOnly.of(isReadOnly)),
-          editableCompartment.reconfigure(EditorView.editable.of(!isReadOnly)),
-        ],
-      });
-    });
+    useVisibleTask$(
+      ({ track }) => {
+        const isReadOnly = !!track(() => readOnly);
+        if (typeof window === "undefined") {
+          return;
+        }
+        const view = editorViewSignal.value;
+        const EditorState = editorStateSignal.value;
+        const readOnlyCompartment = readOnlyCompartmentSignal.value;
+        const editableCompartment = editableCompartmentSignal.value;
+        const EditorView = editorViewCtorSignal.value;
+        if (
+          !view ||
+          !EditorState ||
+          !readOnlyCompartment ||
+          !editableCompartment ||
+          !EditorView
+        ) {
+          return;
+        }
+        view.dispatch({
+          effects: [
+            readOnlyCompartment.reconfigure(
+              EditorState.readOnly.of(isReadOnly),
+            ),
+            editableCompartment.reconfigure(
+              EditorView.editable.of(!isReadOnly),
+            ),
+          ],
+        });
+      },
+      { strategy: "document-ready" },
+    );
 
     return (
       <div

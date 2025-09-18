@@ -1,4 +1,10 @@
-import { component$, useSignal, useTask$, $, useVisibleTask$ } from "@builder.io/qwik";
+import {
+  component$,
+  useSignal,
+  useTask$,
+  $,
+  useVisibleTask$,
+} from "@builder.io/qwik";
 import type { Signal } from "@builder.io/qwik";
 import yaml from "js-yaml";
 import { stampNoteUpdated } from "../lib/diaryx/note-utils";
@@ -21,7 +27,7 @@ const isEmptyMetadataValue = (value: unknown): boolean => {
 const formatYaml = (data: unknown): string => {
   if (!data || typeof data !== "object") return "";
   const entries = Object.entries(data as Record<string, unknown>).filter(
-    ([, value]) => !isEmptyMetadataValue(value)
+    ([, value]) => !isEmptyMetadataValue(value),
   );
   if (!entries.length) {
     return "";
@@ -107,7 +113,9 @@ const toInlineList = (value: string | string[] | undefined): string => {
   if (!value) return "";
   if (Array.isArray(value)) {
     return value
-      .map((item) => (typeof item === "string" ? item.trim() : String(item ?? "").trim()))
+      .map((item) =>
+        typeof item === "string" ? item.trim() : String(item ?? "").trim(),
+      )
       .filter(Boolean)
       .join(", ");
   }
@@ -122,10 +130,14 @@ const normalizeEmailList = (emails: unknown): string[] => {
     new Set(
       emails
         .map((email) =>
-          typeof email === "string" ? email.trim().toLowerCase() : String(email || "").trim().toLowerCase()
+          typeof email === "string"
+            ? email.trim().toLowerCase()
+            : String(email || "")
+                .trim()
+                .toLowerCase(),
         )
-        .filter((email) => email.length > 0 && email.includes("@"))
-    )
+        .filter((email) => email.length > 0 && email.includes("@")),
+    ),
   );
 };
 
@@ -143,7 +155,7 @@ const setMetadataField = (
   key: keyof DiaryxNote["metadata"],
   value: unknown,
   rawYaml: Signal<string>,
-  skipMetadataTimestamp = false
+  skipMetadataTimestamp = false,
 ) => {
   const target = note.metadata as Record<string, unknown>;
   if (value === undefined || (Array.isArray(value) && value.length === 0)) {
@@ -159,7 +171,7 @@ const applyRawYaml = (
   note: DiaryxNote,
   value: string,
   rawYaml: Signal<string>,
-  yamlError: Signal<string | undefined>
+  yamlError: Signal<string | undefined>,
 ) => {
   rawYaml.value = value;
   try {
@@ -169,7 +181,7 @@ const applyRawYaml = (
       return;
     }
     const { metadata, issues } = normalizeDiaryxMetadata(
-      parsed as Record<string, unknown>
+      parsed as Record<string, unknown>,
     );
     Object.assign(note.metadata, metadata);
     stampNoteUpdated(note, { skipMetadata: true });
@@ -214,11 +226,12 @@ const isAutoUpdateEnabled = (note: DiaryxNote): boolean =>
 const toggleAutoUpdate = (
   note: DiaryxNote,
   enabled: boolean,
-  rawYaml: Signal<string>
+  rawYaml: Signal<string>,
 ) => {
   note.autoUpdateTimestamp = enabled;
   if (enabled && !note.metadata.updated) {
-    (note.metadata as Record<string, unknown>).updated = new Date().toISOString();
+    (note.metadata as Record<string, unknown>).updated =
+      new Date().toISOString();
   }
   stampNoteUpdated(note, { skipMetadata: true });
   syncFrontmatter(note, rawYaml);
@@ -229,7 +242,9 @@ export const MetadataPanel = component$(() => {
   const libraryMode = session.ui.libraryMode;
   const note =
     libraryMode === "shared"
-      ? session.sharedNotes.find((item) => item.id === session.sharedActiveNoteId)
+      ? session.sharedNotes.find(
+          (item) => item.id === session.sharedActiveNoteId,
+        )
       : session.notes.find((item) => item.id === session.activeNoteId);
   const isSharedView = libraryMode === "shared";
   const activeTab = useSignal<"details" | "raw">("details");
@@ -276,7 +291,8 @@ export const MetadataPanel = component$(() => {
     const aggregated = new Map<string, Set<string>>();
     for (const item of session.notes) {
       const terms = toVisibilityArray(item.metadata.visibility);
-      const emailsMap = (item.metadata.visibility_emails as Record<string, string[]>) ?? {};
+      const emailsMap =
+        (item.metadata.visibility_emails as Record<string, string[]>) ?? {};
       for (const itemTerm of terms) {
         const normalizedItemTerm = itemTerm.trim();
         if (!normalizedItemTerm) continue;
@@ -297,7 +313,7 @@ export const MetadataPanel = component$(() => {
       Array.from(aggregated.entries()).map(([sharedTerm, set]) => [
         sharedTerm,
         Array.from(set.values()),
-      ])
+      ]),
     );
   });
 
@@ -308,7 +324,7 @@ export const MetadataPanel = component$(() => {
       track(() => session.sharedNotes.length);
       track(() => session.sharedNotesState.lastFetchedAt);
       const current = session.sharedNotes.find(
-        (item) => item.id === session.sharedActiveNoteId
+        (item) => item.id === session.sharedActiveNoteId,
       );
       if (current) {
         rawYaml.value = current.frontmatter ?? formatYaml(current.metadata);
@@ -323,7 +339,9 @@ export const MetadataPanel = component$(() => {
     }
 
     track(() => session.activeNoteId);
-    const current = session.notes.find((item) => item.id === session.activeNoteId);
+    const current = session.notes.find(
+      (item) => item.id === session.activeNoteId,
+    );
     if (current) {
       syncFrontmatter(current, rawYaml);
       yamlError.value = undefined;
@@ -338,9 +356,8 @@ export const MetadataPanel = component$(() => {
           const sharedEmails = sharedEmailsMap[term];
           if (!sharedEmails?.length) continue;
           const currentEmails =
-            ((current.metadata.visibility_emails as Record<string, string[]>) ?? {})[
-              term
-            ] ?? [];
+            ((current.metadata.visibility_emails as Record<string, string[]>) ??
+              {})[term] ?? [];
           if (!emailsMatch(currentEmails, sharedEmails)) {
             updateEmailsForTerm(term, sharedEmails);
           }
@@ -360,18 +377,21 @@ export const MetadataPanel = component$(() => {
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track }) => {
-    track(() => session.ui.showMetadata);
-    if (!session.ui.showMetadata) return;
-    if (typeof window === "undefined") return;
-    const media = window.matchMedia("(max-width: 900px)");
-    if (!media.matches) return;
-    const target = panelRef.value;
-    if (!target) return;
-    window.requestAnimationFrame(() => {
-      target.focus({ preventScroll: true });
-    });
-  });
+  useVisibleTask$(
+    ({ track }) => {
+      track(() => session.ui.showMetadata);
+      if (!session.ui.showMetadata) return;
+      if (typeof window === "undefined") return;
+      const media = window.matchMedia("(max-width: 900px)");
+      if (!media.matches) return;
+      const target = panelRef.value;
+      if (!target) return;
+      window.requestAnimationFrame(() => {
+        target.focus({ preventScroll: true });
+      });
+    },
+    { strategy: "document-ready" },
+  );
 
   if (!note) {
     return (
@@ -392,7 +412,7 @@ export const MetadataPanel = component$(() => {
     const visibilityEmailsMap =
       (note.metadata.visibility_emails as Record<string, string[]>) ?? {};
     const extraEntries = Object.entries(note.metadata).filter(
-      ([key]) => !KNOWN_METADATA_KEYS.has(key)
+      ([key]) => !KNOWN_METADATA_KEYS.has(key),
     );
     const authorDisplay = toInlineList(note.metadata.author);
     const formatDisplay = toInlineList(note.metadata.format);
@@ -461,7 +481,9 @@ export const MetadataPanel = component$(() => {
                           <li key={term}>
                             <span class="visibility-term">{term}</span>
                             {emails.length > 0 && (
-                              <span class="visibility-emails">{emails.join(", ")}</span>
+                              <span class="visibility-emails">
+                                {emails.join(", ")}
+                              </span>
                             )}
                           </li>
                         );
@@ -491,7 +513,9 @@ export const MetadataPanel = component$(() => {
               {note.metadata.this_file_is_root_index !== undefined && (
                 <div>
                   <dt>Root index</dt>
-                  <dd>{note.metadata.this_file_is_root_index ? "Yes" : "No"}</dd>
+                  <dd>
+                    {note.metadata.this_file_is_root_index ? "Yes" : "No"}
+                  </dd>
                 </div>
               )}
               {note.metadata.starred !== undefined && (
@@ -534,7 +558,7 @@ export const MetadataPanel = component$(() => {
 
   const missingRequired = missingMetadataFields(note.metadata);
   const extraEntries = Object.entries(note.metadata).filter(
-    ([key]) => !KNOWN_METADATA_KEYS.has(key)
+    ([key]) => !KNOWN_METADATA_KEYS.has(key),
   );
   const autoUpdate = isAutoUpdateEnabled(note);
 
@@ -588,7 +612,7 @@ export const MetadataPanel = component$(() => {
                   note,
                   "title",
                   (event.target as HTMLInputElement).value,
-                  rawYaml
+                  rawYaml,
                 )
               }
             />
@@ -614,7 +638,7 @@ export const MetadataPanel = component$(() => {
                   note,
                   "author",
                   toValue((event.target as HTMLTextAreaElement).value),
-                  rawYaml
+                  rawYaml,
                 )
               }
             />
@@ -679,7 +703,7 @@ export const MetadataPanel = component$(() => {
                     toggleAutoUpdate(
                       note,
                       (event.target as HTMLInputElement).checked,
-                      rawYaml
+                      rawYaml,
                     )
                   }
                 />
@@ -702,47 +726,65 @@ export const MetadataPanel = component$(() => {
               )}
             </span>
             {(() => {
-              const visibilityList = toVisibilityArray(note.metadata.visibility);
+              const visibilityList = toVisibilityArray(
+                note.metadata.visibility,
+              );
               const visibilityEmailsMap =
-                (note.metadata.visibility_emails as Record<string, string[]>) ?? {};
+                (note.metadata.visibility_emails as Record<string, string[]>) ??
+                {};
               const suggestionList = Array.from(
                 new Set(
                   session.notes
                     .filter((item) => item.id !== note.id)
-                    .flatMap((item) => toVisibilityArray(item.metadata.visibility))
+                    .flatMap((item) =>
+                      toVisibilityArray(item.metadata.visibility),
+                    )
                     .map((term) => term.trim())
-                    .filter((term) => term.length > 0)
-                )
+                    .filter((term) => term.length > 0),
+                ),
               )
                 .filter((term) => !visibilityList.includes(term))
                 .slice(0, 8);
 
               const activeVisibilityTerm =
-                openVisibilityTerm.value && openVisibilityTerm.value !== "__new__"
+                openVisibilityTerm.value &&
+                openVisibilityTerm.value !== "__new__"
                   ? openVisibilityTerm.value
                   : null;
               const activeEmails = activeVisibilityTerm
-                ? visibilityEmailsMap[activeVisibilityTerm] ?? []
+                ? (visibilityEmailsMap[activeVisibilityTerm] ?? [])
                 : [];
               const isActiveSpecial = activeVisibilityTerm
-                ? VISIBILITY_SPECIAL_TERMS.has(activeVisibilityTerm.toLowerCase())
+                ? VISIBILITY_SPECIAL_TERMS.has(
+                    activeVisibilityTerm.toLowerCase(),
+                  )
                 : false;
 
               const applyVisibilityValues = $((values: string[]) => {
                 if (!note) return;
                 const unique = Array.from(
-                  new Set(values.map((term) => term.trim()).filter(Boolean))
+                  new Set(values.map((term) => term.trim()).filter(Boolean)),
                 );
                 if (!unique.length) {
                   setMetadataField(note, "visibility", "", rawYaml);
                 } else if (unique.length === 1) {
-                  setMetadataField(note, "visibility", unique.at(0) ?? "", rawYaml);
+                  setMetadataField(
+                    note,
+                    "visibility",
+                    unique.at(0) ?? "",
+                    rawYaml,
+                  );
                 } else {
                   setMetadataField(note, "visibility", unique, rawYaml);
                 }
 
                 const emails = note.metadata.visibility_emails
-                  ? { ...(note.metadata.visibility_emails as Record<string, string[]>) }
+                  ? {
+                      ...(note.metadata.visibility_emails as Record<
+                        string,
+                        string[]
+                      >),
+                    }
                   : undefined;
                 if (emails) {
                   let changed = false;
@@ -754,9 +796,21 @@ export const MetadataPanel = component$(() => {
                   }
                   if (changed) {
                     if (Object.keys(emails).length === 0) {
-                      setMetadataField(note, "visibility_emails", undefined, rawYaml, true);
+                      setMetadataField(
+                        note,
+                        "visibility_emails",
+                        undefined,
+                        rawYaml,
+                        true,
+                      );
                     } else {
-                      setMetadataField(note, "visibility_emails", emails, rawYaml, true);
+                      setMetadataField(
+                        note,
+                        "visibility_emails",
+                        emails,
+                        rawYaml,
+                        true,
+                      );
                     }
                   }
                 }
@@ -773,13 +827,17 @@ export const MetadataPanel = component$(() => {
                 for (const item of session.notes) {
                   const terms = toVisibilityArray(item.metadata.visibility);
                   const emailsMap =
-                    (item.metadata.visibility_emails as Record<string, string[]>) ?? {};
+                    (item.metadata.visibility_emails as Record<
+                      string,
+                      string[]
+                    >) ?? {};
                   for (const term of terms) {
                     const normalizedTerm = term.trim();
                     if (!normalizedTerm) continue;
                     const termEmails = emailsMap[normalizedTerm] ?? [];
                     if (!termEmails.length) continue;
-                    const set = aggregated.get(normalizedTerm) ?? new Set<string>();
+                    const set =
+                      aggregated.get(normalizedTerm) ?? new Set<string>();
                     for (const email of termEmails) {
                       const normalizedEmail = email.trim().toLowerCase();
                       if (normalizedEmail) {
@@ -794,7 +852,7 @@ export const MetadataPanel = component$(() => {
                   Array.from(aggregated.entries()).map(([term, set]) => [
                     term,
                     Array.from(set.values()),
-                  ])
+                  ]),
                 );
               });
 
@@ -803,13 +861,19 @@ export const MetadataPanel = component$(() => {
                   <div class="visibility-badges">
                     {visibilityList.map((term) => {
                       const emailCount = visibilityEmailsMap[term]?.length ?? 0;
-                      const isSpecial = VISIBILITY_SPECIAL_TERMS.has(term.toLowerCase());
+                      const isSpecial = VISIBILITY_SPECIAL_TERMS.has(
+                        term.toLowerCase(),
+                      );
                       return (
                         <div class="visibility-badge-wrapper" key={term}>
                           <button
                             type="button"
                             class="visibility-badge"
-                            data-active={openVisibilityTerm.value === term ? "true" : undefined}
+                            data-active={
+                              openVisibilityTerm.value === term
+                                ? "true"
+                                : undefined
+                            }
                             data-special={isSpecial ? "true" : undefined}
                             onClick$={() => {
                               openVisibilityTerm.value =
@@ -826,7 +890,9 @@ export const MetadataPanel = component$(() => {
                             class="visibility-remove"
                             aria-label={`Remove visibility term ${term}`}
                             onClick$={$(() => {
-                              const next = visibilityList.filter((value) => value !== term);
+                              const next = visibilityList.filter(
+                                (value) => value !== term,
+                              );
                               applyVisibilityValues(next);
                             })}
                           >
@@ -870,7 +936,10 @@ export const MetadataPanel = component$(() => {
                               openVisibilityTerm.value = normalized;
                               newVisibilityTerm.value = "";
                               if (sharedEmailsForTerm?.length) {
-                                updateEmailsForTerm(normalized, sharedEmailsForTerm);
+                                updateEmailsForTerm(
+                                  normalized,
+                                  sharedEmailsForTerm,
+                                );
                               }
                               return;
                             }
@@ -879,7 +948,10 @@ export const MetadataPanel = component$(() => {
                             openVisibilityTerm.value = normalized;
                             newVisibilityTerm.value = "";
                             if (sharedEmailsForTerm?.length) {
-                              updateEmailsForTerm(normalized, sharedEmailsForTerm);
+                              updateEmailsForTerm(
+                                normalized,
+                                sharedEmailsForTerm,
+                              );
                             }
                           })}
                         >
@@ -902,7 +974,10 @@ export const MetadataPanel = component$(() => {
                                   if (visibilityList.includes(normalized)) {
                                     openVisibilityTerm.value = normalized;
                                     if (sharedEmailsForTerm?.length) {
-                                      updateEmailsForTerm(normalized, sharedEmailsForTerm);
+                                      updateEmailsForTerm(
+                                        normalized,
+                                        sharedEmailsForTerm,
+                                      );
                                     }
                                     return;
                                   }
@@ -910,7 +985,10 @@ export const MetadataPanel = component$(() => {
                                   applyVisibilityValues(next);
                                   openVisibilityTerm.value = normalized;
                                   if (sharedEmailsForTerm?.length) {
-                                    updateEmailsForTerm(normalized, sharedEmailsForTerm);
+                                    updateEmailsForTerm(
+                                      normalized,
+                                      sharedEmailsForTerm,
+                                    );
                                   }
                                 })}
                               >
@@ -935,8 +1013,8 @@ export const MetadataPanel = component$(() => {
                       </header>
                       {isActiveSpecial ? (
                         <p class="visibility-term-info">
-                          This is a special Diaryx visibility setting managed by the
-                          platform.
+                          This is a special Diaryx visibility setting managed by
+                          the platform.
                         </p>
                       ) : (
                         <div class="visibility-term-editor">
@@ -955,7 +1033,9 @@ export const MetadataPanel = component$(() => {
                                         ] as string[] | undefined) ?? [];
                                       updateEmailsForTerm(
                                         activeVisibilityTerm,
-                                        current.filter((value) => value !== email)
+                                        current.filter(
+                                          (value) => value !== email,
+                                        ),
                                       );
                                     })}
                                   >
@@ -964,7 +1044,9 @@ export const MetadataPanel = component$(() => {
                                 </span>
                               ))
                             ) : (
-                              <p class="visibility-term-hint">No recipients yet.</p>
+                              <p class="visibility-term-hint">
+                                No recipients yet.
+                              </p>
                             )}
                           </div>
                           <div class="visibility-email-add">
@@ -994,10 +1076,10 @@ export const MetadataPanel = component$(() => {
                                     newVisibilityEmail.value = "";
                                     return;
                                   }
-                                  updateEmailsForTerm(
-                                    activeVisibilityTerm,
-                                    [...current, normalizedEmail]
-                                  );
+                                  updateEmailsForTerm(activeVisibilityTerm, [
+                                    ...current,
+                                    normalizedEmail,
+                                  ]);
                                   newVisibilityEmail.value = "";
                                 }
                               }}
@@ -1056,7 +1138,7 @@ export const MetadataPanel = component$(() => {
                   note,
                   "format",
                   toValue((event.target as HTMLTextAreaElement).value),
-                  rawYaml
+                  rawYaml,
                 )
               }
             />
@@ -1082,7 +1164,7 @@ export const MetadataPanel = component$(() => {
                   note,
                   "reachable",
                   toValue((event.target as HTMLTextAreaElement).value),
-                  rawYaml
+                  rawYaml,
                 )
               }
             />
@@ -1101,7 +1183,7 @@ export const MetadataPanel = component$(() => {
                     .split(",")
                     .map((item) => item.trim())
                     .filter(Boolean),
-                  rawYaml
+                  rawYaml,
                 );
               }}
             />
@@ -1120,7 +1202,7 @@ export const MetadataPanel = component$(() => {
                     .split(",")
                     .map((item) => item.trim())
                     .filter(Boolean),
-                  rawYaml
+                  rawYaml,
                 );
               }}
             />
@@ -1134,7 +1216,7 @@ export const MetadataPanel = component$(() => {
                   note,
                   "this_file_is_root_index",
                   (event.target as HTMLInputElement).checked,
-                  rawYaml
+                  rawYaml,
                 )
               }
             />
@@ -1149,7 +1231,7 @@ export const MetadataPanel = component$(() => {
                   note,
                   "starred",
                   (event.target as HTMLInputElement).checked,
-                  rawYaml
+                  rawYaml,
                 )
               }
             />
@@ -1164,7 +1246,7 @@ export const MetadataPanel = component$(() => {
                   note,
                   "pinned",
                   (event.target as HTMLInputElement).checked,
-                  rawYaml
+                  rawYaml,
                 )
               }
             />
@@ -1196,7 +1278,7 @@ export const MetadataPanel = component$(() => {
                 note,
                 (event.target as HTMLTextAreaElement).value,
                 rawYaml,
-                yamlError
+                yamlError,
               )
             }
           />
