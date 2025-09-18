@@ -52,6 +52,10 @@
   --accent-surface: color-mix(in srgb, var(--accent-primary) 20%, #0f172a 80%);
 }
 
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 :root[data-accent="violet"] {
   --accent-primary: var(--accent-violet);
 }
@@ -69,7 +73,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --surface-base: #0f172a;
     --surface-elevated: rgba(15, 23, 42, 0.96);
     --surface-border: rgba(148, 163, 184, 0.25);
@@ -88,6 +92,7 @@
     --inline-code-bg: rgba(148, 163, 184, 0.28);
     --accent-on-primary: #f8fafc;
     --accent-surface: color-mix(in srgb, var(--accent-primary) 20%, #0f172a 80%);
+    color-scheme: dark;
   }
 }
 
