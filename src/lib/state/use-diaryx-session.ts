@@ -11,26 +11,27 @@ const createInitialState = (): DiaryxSessionState => {
       query: "",
       tag: undefined,
     },
-  ui: {
-    theme: "system",
-    accent: "violet",
-    leftPanelWidth: 260,
-    rightPanelWidth: 300,
-    showLibrary: true,
-    showMetadata: true,
-    showPreview: true,
-    showCommandPalette: false,
-    editorMode: "split",
-    showSettings: false,
-  },
-  importState: {
-    isImporting: false,
-    lastError: undefined,
-  },
-  exportState: {
-    isExporting: false,
-    lastSuccessAt: undefined,
-  },
+    ui: {
+      theme: "system",
+      accent: "violet",
+      leftPanelWidth: 260,
+      rightPanelWidth: 300,
+      showLibrary: true,
+      showMetadata: true,
+      showPreview: true,
+      showCommandPalette: false,
+      editorMode: "split",
+      showSettings: false,
+    },
+    importState: {
+      isImporting: false,
+      lastError: undefined,
+    },
+    exportState: {
+      isExporting: false,
+      lastSuccessAt: undefined,
+    },
+    sharedVisibilityEmails: {},
   };
 };
 

@@ -32,6 +32,13 @@ const ensureNotesTable = async (pool: Pool) => {
     );
     CREATE INDEX IF NOT EXISTS diaryx_note_user_updated_idx
       ON diaryx_note (user_id, updated_at DESC);
+    CREATE TABLE IF NOT EXISTS diaryx_visibility_term (
+      user_id TEXT NOT NULL,
+      term TEXT NOT NULL,
+      emails TEXT[] NOT NULL DEFAULT '{}',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, term)
+    );
   `);
   tableEnsured = true;
 };
@@ -43,6 +50,18 @@ export const listNotesForUser = async (userId: string): Promise<DbNote[]> => {
        FROM diaryx_note
       WHERE user_id = $1
       ORDER BY last_modified DESC, updated_at DESC` ,
+    [userId]
+  );
+  return result.rows;
+};
+
+export const listVisibilityTermsForUser = async (userId: string) => {
+  await ensureNotesTable(dbPool);
+  const result = await dbPool.query<{ term: string; emails: string[] }>(
+    `SELECT term, emails
+       FROM diaryx_visibility_term
+      WHERE user_id = $1
+      ORDER BY term ASC`,
     [userId]
   );
   return result.rows;
@@ -73,9 +92,34 @@ export const upsertNotesForUser = async (userId: string, notes: SyncInputNote[])
 export const deleteAllNotesForUser = async (userId: string) => {
   await ensureNotesTable(dbPool);
   await dbPool.query(`DELETE FROM diaryx_note WHERE user_id = $1`, [userId]);
+  await dbPool.query(`DELETE FROM diaryx_visibility_term WHERE user_id = $1`, [userId]);
 };
 
 export const deleteNoteForUser = async (userId: string, noteId: string) => {
   await ensureNotesTable(dbPool);
   await dbPool.query(`DELETE FROM diaryx_note WHERE user_id = $1 AND id = $2`, [userId, noteId]);
+};
+
+export const updateVisibilityTermsForUser = async (
+  userId: string,
+  terms: Record<string, string[]>
+) => {
+  await ensureNotesTable(dbPool);
+  const client = dbPool;
+  const termEntries = Object.entries(terms).map(([term, emails]) => ({
+    term,
+    emails: Array.from(new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))),
+  }));
+
+  await client.query(`DELETE FROM diaryx_visibility_term WHERE user_id = $1`, [userId]);
+  if (!termEntries.length) return;
+
+  const insertPromises = termEntries.map(({ term, emails }) =>
+    client.query(
+      `INSERT INTO diaryx_visibility_term (user_id, term, emails, updated_at)
+         VALUES ($1, $2, $3::text[], NOW())`,
+      [userId, term, emails]
+    )
+  );
+  await Promise.all(insertPromises);
 };

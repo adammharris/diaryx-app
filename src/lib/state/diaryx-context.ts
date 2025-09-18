@@ -33,6 +33,7 @@ export interface DiaryxSessionState {
     isExporting: boolean;
     lastSuccessAt?: number;
   };
+  sharedVisibilityEmails: Record<string, string[]>;
 }
 
 export const DiaryxSessionContext = createContextId<DiaryxSessionState>(

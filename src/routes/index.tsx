@@ -18,6 +18,19 @@ const ACCENT_VALUES: readonly ColorAccent[] = ["violet", "blue", "teal", "amber"
 const isValidAccent = (value: string | null): value is ColorAccent =>
   value !== null && ACCENT_VALUES.includes(value as ColorAccent);
 
+const toVisibilityArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item.trim() : String(item).trim()))
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    return normalized ? [normalized] : [];
+  }
+  return [];
+};
+
 const HANDLE_WIDTH = 16;
 const MIN_EDITOR_WIDTH = 420;
 const MIN_PANEL_WIDTH = 180;
@@ -253,11 +266,39 @@ export default component$(() => {
     if (!notesHydrated.value) return;
     if (!session.notes.length) {
       clearMarkdownNotes();
+      session.sharedVisibilityEmails = {};
       return;
     }
     persistMarkdownNotes(session.notes);
     const repo = createDiaryxRepository();
     await Promise.all(session.notes.map((note) => repo.save(note)));
+
+    const aggregated = new Map<string, Set<string>>();
+    for (const item of session.notes) {
+      const terms = toVisibilityArray(item.metadata.visibility);
+      const emailsMap =
+        (item.metadata.visibility_emails as Record<string, string[]>) ?? {};
+      for (const term of terms) {
+        const normalizedTerm = term.trim();
+        if (!normalizedTerm) continue;
+        const existing = aggregated.get(normalizedTerm) ?? new Set<string>();
+        const emails = emailsMap[normalizedTerm] ?? [];
+        for (const email of emails) {
+          const normalizedEmail = email.trim().toLowerCase();
+          if (normalizedEmail) {
+            existing.add(normalizedEmail);
+          }
+        }
+        aggregated.set(normalizedTerm, existing);
+      }
+    }
+
+    session.sharedVisibilityEmails = Object.fromEntries(
+      Array.from(aggregated.entries()).map(([term, emails]) => [
+        term,
+        Array.from(emails.values()),
+      ])
+    );
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task

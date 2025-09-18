@@ -12,6 +12,11 @@ interface RemoteNotePayload {
   lastModified?: number;
 }
 
+interface RemoteVisibilityTerm {
+  term: string;
+  emails: string[];
+}
+
 const buildPayload = (note: DiaryxNote) => ({
   id: note.id,
   markdown: exportDiaryxNoteToMarkdown(note, { includeFrontmatter: true }),
@@ -40,6 +45,12 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
 
   const payload = session.notes.map(buildPayload);
   const localMarkdownById = new Map(payload.map((entry) => [entry.id, entry.markdown]));
+  const visibilityTermsPayload = session.sharedVisibilityEmails
+    ? Object.entries(session.sharedVisibilityEmails).map(([term, emails]) => ({
+        term,
+        emails: Array.from(new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))),
+      }))
+    : [];
 
   const response = await fetch("/api/notes", {
     method: "POST",
@@ -47,7 +58,7 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
       "Content-Type": "application/json",
     },
     credentials: "include",
-    body: JSON.stringify({ notes: payload }),
+    body: JSON.stringify({ notes: payload, visibilityTerms: visibilityTermsPayload }),
   });
 
   if (response.status === 401) {
@@ -59,8 +70,14 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
     throw new Error(text || "Failed to sync notes");
   }
 
-  const data = (await response.json()) as { notes?: RemoteNotePayload[] };
+  const data = (await response.json()) as {
+    notes?: RemoteNotePayload[];
+    visibilityTerms?: RemoteVisibilityTerm[];
+  };
   const remoteNotes = Array.isArray(data.notes) ? data.notes : [];
+  const remoteVisibilityTerms = Array.isArray(data.visibilityTerms)
+    ? data.visibilityTerms
+    : [];
   const parsed: DiaryxNote[] = [];
   const remoteMarkdownById = new Map<string, string>();
   for (const remote of remoteNotes) {
@@ -133,6 +150,25 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
   persistMarkdownNotes(nextNotes);
   await repo.clear();
   await Promise.all(nextNotes.map((note) => repo.save(note)));
+
+  if (remoteVisibilityTerms.length) {
+    const aggregated = new Map<string, Set<string>>();
+    for (const entry of remoteVisibilityTerms) {
+      const term = entry.term.trim();
+      if (!term) continue;
+      const set = aggregated.get(term) ?? new Set<string>();
+      for (const email of entry.emails) {
+        const normalizedEmail = email.trim().toLowerCase();
+        if (normalizedEmail) {
+          set.add(normalizedEmail);
+        }
+      }
+      aggregated.set(term, set);
+    }
+    session.sharedVisibilityEmails = Object.fromEntries(
+      Array.from(aggregated.entries()).map(([term, set]) => [term, Array.from(set.values())])
+    );
+  }
 };
 
 export const deleteNoteOnServer = async (noteId: string) => {

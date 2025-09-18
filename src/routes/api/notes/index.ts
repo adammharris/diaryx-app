@@ -1,6 +1,11 @@
 import type { RequestEvent, RequestHandler } from "@builder.io/qwik-city";
 import { auth } from "~/lib/auth";
-import { listNotesForUser, upsertNotesForUser } from "~/lib/server/note-storage";
+import {
+  listNotesForUser,
+  upsertNotesForUser,
+  listVisibilityTermsForUser,
+  updateVisibilityTermsForUser,
+} from "~/lib/server/note-storage";
 
 const respondUnauthorized = (event: RequestEvent): void => {
   event.json(401, { error: "UNAUTHORIZED" });
@@ -28,6 +33,7 @@ export const onGet: RequestHandler = async (event) => {
   }
 
   const rows = await listNotesForUser(user.id);
+  const terms = await listVisibilityTermsForUser(user.id);
   event.json(200, {
     notes: rows.map((row) => ({
       id: row.id,
@@ -35,6 +41,7 @@ export const onGet: RequestHandler = async (event) => {
       sourceName: row.source_name,
       lastModified: Number(row.last_modified ?? Date.now()),
     })),
+    visibilityTerms: terms,
   });
 };
 
@@ -56,6 +63,9 @@ export const onPost: RequestHandler = async (event) => {
 
   const notes = Array.isArray((payload as any)?.notes)
     ? (payload as any).notes
+    : [];
+  const visibilityTermsPayload = Array.isArray((payload as any)?.visibilityTerms)
+    ? (payload as any).visibilityTerms
     : [];
 
   const validNotes = notes
@@ -79,7 +89,34 @@ export const onPost: RequestHandler = async (event) => {
     await upsertNotesForUser(user.id, validNotes);
   }
 
+  const validTerms = visibilityTermsPayload
+    .filter((item: any) => item && typeof item.term === "string")
+    .map((item: any) => ({
+      term: item.term.trim(),
+      emails: Array.isArray(item.emails)
+        ? item.emails
+            .map((email: unknown) =>
+              typeof email === "string" ? email.trim().toLowerCase() : ""
+            )
+            .filter((email: string) => email.includes("@"))
+        : [],
+    }))
+    .filter((item: { term: string; emails: string[] }) => item.term.length > 0);
+
+  if (validTerms.length) {
+    await updateVisibilityTermsForUser(
+      user.id,
+      Object.fromEntries(
+        validTerms.map(({ term, emails }: { term: string; emails: string[] }) => [
+          term,
+          emails,
+        ])
+      )
+    );
+  }
+
   const rows = await listNotesForUser(user.id);
+  const terms = await listVisibilityTermsForUser(user.id);
   event.json(200, {
     notes: rows.map((row) => ({
       id: row.id,
@@ -87,5 +124,6 @@ export const onPost: RequestHandler = async (event) => {
       sourceName: row.source_name,
       lastModified: Number(row.last_modified ?? Date.now()),
     })),
+    visibilityTerms: terms,
   });
 };

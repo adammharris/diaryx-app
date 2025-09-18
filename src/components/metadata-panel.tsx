@@ -100,7 +100,31 @@ const toValue = (value: string): string | string[] => {
     .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
-  return parts.length <= 1 ? (parts[0] ?? "") : parts;
+  return parts.length <= 1 ? (parts.at(0) ?? "") : parts;
+};
+
+const normalizeEmailList = (emails: unknown): string[] => {
+  if (!Array.isArray(emails)) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      emails
+        .map((email) =>
+          typeof email === "string" ? email.trim().toLowerCase() : String(email || "").trim().toLowerCase()
+        )
+        .filter((email) => email.length > 0 && email.includes("@"))
+    )
+  );
+};
+
+const emailsMatch = (a: string[], b: string[]): boolean => {
+  const normalizedA = Array.isArray(a) ? normalizeEmailList(a) : [];
+  const normalizedB = Array.isArray(b) ? normalizeEmailList(b) : [];
+  if (normalizedA.length !== normalizedB.length) {
+    return false;
+  }
+  return normalizedA.every((email) => normalizedB.includes(email));
 };
 
 const setMetadataField = (
@@ -199,6 +223,61 @@ export const MetadataPanel = component$(() => {
   const newVisibilityTerm = useSignal("");
   const newVisibilityEmail = useSignal("");
 
+  if (!note) {
+    return (
+      <aside class="metadata-panel empty">
+        <p>No note selected.</p>
+      </aside>
+    );
+  }
+
+  const updateEmailsForTerm = $((term: string, emails: string[]) => {
+    if (!note) return;
+    const normalizedTerm = term.trim();
+    if (!normalizedTerm) return;
+    const uniqueEmails = normalizeEmailList(emails);
+    const current = note.metadata.visibility_emails
+      ? { ...(note.metadata.visibility_emails as Record<string, string[]>) }
+      : {};
+    if (uniqueEmails.length) {
+      current[normalizedTerm] = uniqueEmails;
+    } else {
+      delete current[normalizedTerm];
+    }
+    if (Object.keys(current).length === 0) {
+      setMetadataField(note, "visibility_emails", undefined, rawYaml, true);
+    } else {
+      setMetadataField(note, "visibility_emails", current, rawYaml, true);
+    }
+
+    const aggregated = new Map<string, Set<string>>();
+    for (const item of session.notes) {
+      const terms = toVisibilityArray(item.metadata.visibility);
+      const emailsMap = (item.metadata.visibility_emails as Record<string, string[]>) ?? {};
+      for (const itemTerm of terms) {
+        const normalizedItemTerm = itemTerm.trim();
+        if (!normalizedItemTerm) continue;
+        const emailsForTerm = emailsMap[normalizedItemTerm] ?? [];
+        if (!emailsForTerm.length) continue;
+        const set = aggregated.get(normalizedItemTerm) ?? new Set<string>();
+        for (const email of emailsForTerm) {
+          const normalizedEmail = email.trim().toLowerCase();
+          if (normalizedEmail) {
+            set.add(normalizedEmail);
+          }
+        }
+        aggregated.set(normalizedItemTerm, set);
+      }
+    }
+
+    session.sharedVisibilityEmails = Object.fromEntries(
+      Array.from(aggregated.entries()).map(([sharedTerm, set]) => [
+        sharedTerm,
+        Array.from(set.values()),
+      ])
+    );
+  });
+
   useTask$(({ track }) => {
     track(() => session.activeNoteId);
     const current = session.notes.find((item) => item.id === session.activeNoteId);
@@ -208,6 +287,22 @@ export const MetadataPanel = component$(() => {
       openVisibilityTerm.value = null;
       newVisibilityTerm.value = "";
       newVisibilityEmail.value = "";
+
+      const sharedEmailsMap = session.sharedVisibilityEmails;
+      if (sharedEmailsMap) {
+        const terms = toVisibilityArray(current.metadata.visibility);
+        for (const term of terms) {
+          const sharedEmails = sharedEmailsMap[term];
+          if (!sharedEmails?.length) continue;
+          const currentEmails =
+            ((current.metadata.visibility_emails as Record<string, string[]>) ?? {})[
+              term
+            ] ?? [];
+          if (!emailsMatch(currentEmails, sharedEmails)) {
+            updateEmailsForTerm(term, sharedEmails);
+          }
+        }
+      }
     }
   });
 
@@ -417,18 +512,15 @@ export const MetadataPanel = component$(() => {
                 ? VISIBILITY_SPECIAL_TERMS.has(activeVisibilityTerm.toLowerCase())
                 : false;
 
-              const updateVisibilityValues = $(
-                (
-                  _event: Event,
-                  values: string[]
-                ) => {
-                  const unique = Array.from(
-                    new Set(values.map((term) => term.trim()).filter(Boolean))
-                  );
-                  if (!unique.length) {
-                    setMetadataField(note, "visibility", "", rawYaml);
+              const applyVisibilityValues = $((values: string[]) => {
+                if (!note) return;
+                const unique = Array.from(
+                  new Set(values.map((term) => term.trim()).filter(Boolean))
+                );
+                if (!unique.length) {
+                  setMetadataField(note, "visibility", "", rawYaml);
                 } else if (unique.length === 1) {
-                  setMetadataField(note, "visibility", unique[0], rawYaml);
+                  setMetadataField(note, "visibility", unique.at(0) ?? "", rawYaml);
                 } else {
                   setMetadataField(note, "visibility", unique, rawYaml);
                 }
@@ -453,36 +545,42 @@ export const MetadataPanel = component$(() => {
                   }
                 }
 
-                  if (
-                    openVisibilityTerm.value &&
-                    openVisibilityTerm.value !== "__new__" &&
-                    !unique.includes(openVisibilityTerm.value)
-                  ) {
-                    openVisibilityTerm.value = null;
+                if (
+                  openVisibilityTerm.value &&
+                  openVisibilityTerm.value !== "__new__" &&
+                  !unique.includes(openVisibilityTerm.value)
+                ) {
+                  openVisibilityTerm.value = null;
+                }
+
+                const aggregated = new Map<string, Set<string>>();
+                for (const item of session.notes) {
+                  const terms = toVisibilityArray(item.metadata.visibility);
+                  const emailsMap =
+                    (item.metadata.visibility_emails as Record<string, string[]>) ?? {};
+                  for (const term of terms) {
+                    const normalizedTerm = term.trim();
+                    if (!normalizedTerm) continue;
+                    const termEmails = emailsMap[normalizedTerm] ?? [];
+                    if (!termEmails.length) continue;
+                    const set = aggregated.get(normalizedTerm) ?? new Set<string>();
+                    for (const email of termEmails) {
+                      const normalizedEmail = email.trim().toLowerCase();
+                      if (normalizedEmail) {
+                        set.add(normalizedEmail);
+                      }
+                    }
+                    aggregated.set(normalizedTerm, set);
                   }
                 }
-              );
 
-              const updateEmailsForTerm = (term: string, emails: string[]) => {
-                const normalizedTerm = term.trim();
-                if (!normalizedTerm) return;
-                const uniqueEmails = Array.from(
-                  new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))
+                session.sharedVisibilityEmails = Object.fromEntries(
+                  Array.from(aggregated.entries()).map(([term, set]) => [
+                    term,
+                    Array.from(set.values()),
+                  ])
                 );
-                const current = note.metadata.visibility_emails
-                  ? { ...(note.metadata.visibility_emails as Record<string, string[]>) }
-                  : {};
-                if (uniqueEmails.length) {
-                  current[normalizedTerm] = uniqueEmails;
-                } else {
-                  delete current[normalizedTerm];
-                }
-                if (Object.keys(current).length === 0) {
-                  setMetadataField(note, "visibility_emails", undefined, rawYaml, true);
-                } else {
-                  setMetadataField(note, "visibility_emails", current, rawYaml, true);
-                }
-              };
+              });
 
               return (
                 <div class="visibility-controls">
@@ -511,10 +609,10 @@ export const MetadataPanel = component$(() => {
                             type="button"
                             class="visibility-remove"
                             aria-label={`Remove visibility term ${term}`}
-                              onClick$={$(() => {
-                                const next = visibilityList.filter((value) => value !== term);
-                                updateVisibilityValues(undefined as unknown as Event, next);
-                              })}
+                            onClick$={$(() => {
+                              const next = visibilityList.filter((value) => value !== term);
+                              applyVisibilityValues(next);
+                            })}
                           >
                             ×
                           </button>
@@ -550,15 +648,23 @@ export const MetadataPanel = component$(() => {
                           onClick$={$(() => {
                             const normalized = newVisibilityTerm.value.trim();
                             if (!normalized) return;
+                            const sharedEmailsForTerm =
+                              session.sharedVisibilityEmails[normalized];
                             if (visibilityList.includes(normalized)) {
                               openVisibilityTerm.value = normalized;
                               newVisibilityTerm.value = "";
+                              if (sharedEmailsForTerm?.length) {
+                                updateEmailsForTerm(normalized, sharedEmailsForTerm);
+                              }
                               return;
                             }
                             const next = [...visibilityList, normalized];
-                            updateVisibilityValues(undefined as unknown as Event, next);
+                            applyVisibilityValues(next);
                             openVisibilityTerm.value = normalized;
                             newVisibilityTerm.value = "";
+                            if (sharedEmailsForTerm?.length) {
+                              updateEmailsForTerm(normalized, sharedEmailsForTerm);
+                            }
                           })}
                         >
                           Add term
@@ -575,13 +681,21 @@ export const MetadataPanel = component$(() => {
                                 onClick$={$(() => {
                                   const normalized = term.trim();
                                   if (!normalized) return;
+                                  const sharedEmailsForTerm =
+                                    session.sharedVisibilityEmails[normalized];
                                   if (visibilityList.includes(normalized)) {
                                     openVisibilityTerm.value = normalized;
+                                    if (sharedEmailsForTerm?.length) {
+                                      updateEmailsForTerm(normalized, sharedEmailsForTerm);
+                                    }
                                     return;
                                   }
                                   const next = [...visibilityList, normalized];
-                                  updateVisibilityValues(undefined as unknown as Event, next);
+                                  applyVisibilityValues(next);
                                   openVisibilityTerm.value = normalized;
+                                  if (sharedEmailsForTerm?.length) {
+                                    updateEmailsForTerm(normalized, sharedEmailsForTerm);
+                                  }
                                 })}
                               >
                                 {term}
@@ -650,10 +764,10 @@ export const MetadataPanel = component$(() => {
                               onKeyDown$={(event) => {
                                 if ((event as KeyboardEvent).key === "Enter") {
                                   event.preventDefault();
-                                  const normalizedEmail = newVisibilityEmail.value
-                                    .trim()
-                                    .toLowerCase();
-                                  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+                                  const normalizedEmail = normalizeEmailList([
+                                    newVisibilityEmail.value,
+                                  ]).at(0);
+                                  if (!normalizedEmail) {
                                     return;
                                   }
                                   const current =
@@ -664,10 +778,10 @@ export const MetadataPanel = component$(() => {
                                     newVisibilityEmail.value = "";
                                     return;
                                   }
-                                  updateEmailsForTerm(activeVisibilityTerm, [
-                                    ...current,
-                                    normalizedEmail,
-                                  ]);
+                                  updateEmailsForTerm(
+                                    activeVisibilityTerm,
+                                    [...current, normalizedEmail]
+                                  );
                                   newVisibilityEmail.value = "";
                                 }
                               }}
@@ -675,10 +789,10 @@ export const MetadataPanel = component$(() => {
                             <button
                               type="button"
                               onClick$={$(() => {
-                                const normalizedEmail = newVisibilityEmail.value
-                                  .trim()
-                                  .toLowerCase();
-                                if (!normalizedEmail || !normalizedEmail.includes("@")) return;
+                                const normalizedEmail = normalizeEmailList([
+                                  newVisibilityEmail.value,
+                                ]).at(0);
+                                if (!normalizedEmail) return;
                                 const current =
                                   (note.metadata.visibility_emails?.[
                                     activeVisibilityTerm
