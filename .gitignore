@@ -42,3 +42,6 @@ Diaryx Writing Specification.md
 # Yarn
 .yarn/*
 !.yarn/releases
+
+# Vercel
+.vercel

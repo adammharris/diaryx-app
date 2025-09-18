@@ -1,4 +1,4 @@
-import { createAuthClient } from "better-auth/client";
+import type { createAuthClient } from "better-auth/client";
 
 const getBaseURL = () => {
   if (typeof window !== "undefined" && window.location) {
@@ -8,6 +8,24 @@ const getBaseURL = () => {
   return `${origin.replace(/\/$/, "")}/api/auth`;
 };
 
-export const authClient = createAuthClient({
-  baseURL: getBaseURL(),
-});
+type AuthClient = ReturnType<typeof createAuthClient>;
+
+let clientPromise: Promise<AuthClient> | undefined;
+
+export const hasAuthClient = () => typeof window !== "undefined";
+
+export const getAuthClient = async (): Promise<AuthClient> => {
+  if (!hasAuthClient()) {
+    throw new Error("Auth client is only available in the browser");
+  }
+  if (!clientPromise) {
+    clientPromise = import("better-auth/client").then(({ createAuthClient }) =>
+      createAuthClient({
+        baseURL: getBaseURL(),
+      })
+    );
+  }
+  return clientPromise;
+};
+
+export type { AuthClient };

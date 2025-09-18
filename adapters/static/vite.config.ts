@@ -1,6 +1,6 @@
 import { staticAdapter } from "@builder.io/qwik-city/adapters/static/vite";
 import { extendConfig } from "@builder.io/qwik-city/vite";
-import baseConfig from "../../vite.config";
+import baseConfig from "../../vite.config.mjs";
 
 export default extendConfig(baseConfig, () => {
   return {
@@ -13,8 +13,6 @@ export default extendConfig(baseConfig, () => {
     plugins: [
       staticAdapter({
         origin: "https://yoursite.qwik.dev",
-        maxWorkers: 1,
-        maxTasksPerWorker: 10,
       }),
     ],
   };

@@ -3,7 +3,7 @@ import type { DocumentHead } from "@builder.io/qwik-city";
 import { MetadataPanel } from "../components/metadata-panel";
 import { NoteEditor } from "../components/note-editor";
 import { NoteList } from "../components/note-list";
-import { authClient } from "../lib/auth-client";
+import { getAuthClient, hasAuthClient } from "../lib/auth-client";
 import { createDiaryxRepository } from "../lib/persistence/diaryx-repository";
 import {
   loadMarkdownNotes,
@@ -40,10 +40,7 @@ export default component$(() => {
   const session = useDiaryxSessionProvider();
   const shellRef = useSignal<HTMLDivElement>();
   const notesHydrated = useSignal(false);
-  const authSessionStore = authClient.useSession;
-  const currentUserId = useSignal<string | null>(
-    authSessionStore.get()?.data?.user?.id ?? null
-  );
+  const currentUserId = useSignal<string | null>(null);
   const isSyncing = useSignal(false);
 
   const clampWidths = $(
@@ -249,9 +246,15 @@ export default component$(() => {
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(() => {
-    const unsubscribe = authSessionStore.subscribe((value) => {
-      const userId = value?.data?.user?.id ?? null;
+  useVisibleTask$(async () => {
+    if (!hasAuthClient()) return;
+    const client = await getAuthClient();
+    const store = client.useSession;
+    const initial = store.get();
+    currentUserId.value = initial?.data?.user?.id ?? null;
+    const unsubscribe = store.subscribe((value) => {
+      const nextValue = value as typeof initial;
+      const userId = nextValue?.data?.user?.id ?? null;
       if (currentUserId.value !== userId) {
         currentUserId.value = userId;
       }

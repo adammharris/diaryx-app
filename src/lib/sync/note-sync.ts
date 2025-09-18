@@ -4,18 +4,8 @@ import type { DiaryxNote } from "../diaryx/types";
 import type { DiaryxSessionState } from "../state/diaryx-context";
 import { persistMarkdownNotes } from "../persistence/markdown-store";
 import { createDiaryxRepository } from "../persistence/diaryx-repository";
-
-interface RemoteNotePayload {
-  id: string;
-  markdown: string;
-  sourceName?: string | null;
-  lastModified?: number;
-}
-
-interface RemoteVisibilityTerm {
-  term: string;
-  emails: string[];
-}
+import { syncNotesOnServer, deleteNoteOnServerRpc } from "../server/note-rpc";
+import type { RemoteNotePayload, RemoteVisibilityTerm } from "./note-sync-types";
 
 const buildPayload = (note: DiaryxNote) => ({
   id: note.id,
@@ -41,7 +31,7 @@ const parseRemoteNote = (payload: RemoteNotePayload): DiaryxNote | null => {
 };
 
 export const syncNotesWithServer = async (session: DiaryxSessionState) => {
-  if (typeof fetch === "undefined") return;
+  if (typeof window === "undefined") return;
 
   const payload = session.notes.map(buildPayload);
   const localMarkdownById = new Map(payload.map((entry) => [entry.id, entry.markdown]));
@@ -52,31 +42,22 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
       }))
     : [];
 
-  const response = await fetch("/api/notes", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify({ notes: payload, visibilityTerms: visibilityTermsPayload }),
+  const response = await syncNotesOnServer({
+    notes: payload,
+    visibilityTerms: visibilityTermsPayload,
   });
 
   if (response.status === 401) {
     return;
   }
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(text || "Failed to sync notes");
+  if (response.status !== 200 || !response.data) {
+    throw new Error("Failed to sync notes");
   }
 
-  const data = (await response.json()) as {
-    notes?: RemoteNotePayload[];
-    visibilityTerms?: RemoteVisibilityTerm[];
-  };
-  const remoteNotes = Array.isArray(data.notes) ? data.notes : [];
-  const remoteVisibilityTerms = Array.isArray(data.visibilityTerms)
-    ? data.visibilityTerms
+  const remoteNotes = Array.isArray(response.data.notes) ? response.data.notes : [];
+  const remoteVisibilityTerms = Array.isArray(response.data.visibilityTerms)
+    ? response.data.visibilityTerms
     : [];
   const parsed: DiaryxNote[] = [];
   const remoteMarkdownById = new Map<string, string>();
@@ -172,12 +153,9 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
 };
 
 export const deleteNoteOnServer = async (noteId: string) => {
-  if (typeof fetch === "undefined") return;
+  if (typeof window === "undefined") return;
   try {
-    await fetch(`/api/notes/${encodeURIComponent(noteId)}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
+    await deleteNoteOnServerRpc(noteId);
   } catch (error) {
     console.warn("Failed to delete note on server", error);
   }

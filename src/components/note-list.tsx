@@ -164,6 +164,9 @@ export const NoteList = component$(() => {
   });
 
   const handleExportActive = $(async (format: "html" | "markdown") => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
     const note = session.notes.find((item) => item.id === session.activeNoteId);
     if (!note) return;
     session.exportState.isExporting = true;

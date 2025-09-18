@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool } from "@neondatabase/serverless";
 import { dbPool } from "../auth";
 
 interface SyncInputNote {

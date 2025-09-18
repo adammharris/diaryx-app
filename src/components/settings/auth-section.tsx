@@ -1,5 +1,6 @@
 import { component$, useSignal, $, useVisibleTask$ } from "@builder.io/qwik";
-import { authClient } from "~/lib/auth-client";
+import { getAuthClient, hasAuthClient } from "~/lib/auth-client";
+import type { AuthClient } from "~/lib/auth-client";
 import { useDiaryxSession } from "~/lib/state/use-diaryx-session";
 import { syncNotesWithServer } from "~/lib/sync/note-sync";
 
@@ -12,25 +13,28 @@ export const AuthSection = component$(() => {
   const isLoading = useSignal(false);
   const errorMessage = useSignal<string | null>(null);
   const successMessage = useSignal<string | null>(null);
-  const sessionStore = authClient.useSession;
-  const session = useSignal(sessionStore.get());
+  type AuthSessionValue = ReturnType<AuthClient["useSession"]["get"]> | null;
+  const session = useSignal<AuthSessionValue>(null);
   const diaryxSession = useDiaryxSession();
 
-  useVisibleTask$(() => {
-    session.value = sessionStore.get();
-    const unsubscribe = sessionStore.subscribe((value) => {
-      session.value = value;
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(async () => {
+    if (!hasAuthClient()) return;
+    const client = await getAuthClient();
+    session.value = client.useSession.get();
+    const unsubscribe = client.useSession.subscribe((value) => {
+      session.value = value as AuthSessionValue;
     });
     return () => unsubscribe();
   });
 
-  const resetMessages = () => {
+  const resetMessages = $( () => {
     errorMessage.value = null;
     successMessage.value = null;
-  };
+  });
 
   const handleSignUp = $(async () => {
-    resetMessages();
+    await resetMessages();
     if (!email.value || !password.value || !name.value) {
       errorMessage.value = "Please complete all required fields.";
       return;
@@ -45,7 +49,8 @@ export const AuthSection = component$(() => {
     }
     try {
       isLoading.value = true;
-      await authClient.signUp.email(
+      const client = await getAuthClient();
+      await client.signUp.email(
         {
           email: email.value,
           password: password.value,
@@ -80,14 +85,15 @@ export const AuthSection = component$(() => {
   });
 
   const handleSignIn = $(async () => {
-    resetMessages();
+    await resetMessages();
     if (!email.value || !password.value) {
       errorMessage.value = "Email and password are required.";
       return;
     }
     try {
       isLoading.value = true;
-      await authClient.signIn.email(
+      const client = await getAuthClient();
+      await client.signIn.email(
         {
           email: email.value,
           password: password.value,
@@ -118,10 +124,11 @@ export const AuthSection = component$(() => {
   });
 
   const handleSignOut = $(async () => {
-    resetMessages();
+    await resetMessages();
     isLoading.value = true;
     try {
-      await authClient.signOut(undefined, {
+      const client = await getAuthClient();
+      await client.signOut(undefined, {
         onError: (ctx: any) => {
           errorMessage.value = ctx.error?.message ?? "Unable to sign out.";
         },
@@ -180,10 +187,10 @@ export const AuthSection = component$(() => {
           <button
             type="button"
             class={{ active: formState.value === "sign-in" }}
-            onClick$={() => {
+            onClick$={$(async () => {
               formState.value = "sign-in";
-              resetMessages();
-            }}
+              await resetMessages();
+            })}
             disabled={isLoading.value && formState.value === "sign-in"}
           >
             Sign In
@@ -191,10 +198,10 @@ export const AuthSection = component$(() => {
           <button
             type="button"
             class={{ active: formState.value === "sign-up" }}
-            onClick$={() => {
+            onClick$={$(async () => {
               formState.value = "sign-up";
-              resetMessages();
-            }}
+              await resetMessages();
+            })}
             disabled={isLoading.value && formState.value === "sign-up"}
           >
             Register

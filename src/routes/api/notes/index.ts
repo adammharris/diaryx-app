@@ -56,7 +56,7 @@ export const onPost: RequestHandler = async (event) => {
   let payload: unknown;
   try {
     payload = await request.json();
-  } catch (error) {
+  } catch {
     event.json(400, { error: "INVALID_JSON" });
     return;
   }
