@@ -86,6 +86,8 @@
     --editor-code-border: rgba(148, 163, 184, 0.22);
     --code-block-bg: rgba(15, 23, 42, 0.75);
     --inline-code-bg: rgba(148, 163, 184, 0.28);
+    --accent-on-primary: #f8fafc;
+    --accent-surface: color-mix(in srgb, var(--accent-primary) 20%, #0f172a 80%);
   }
 }
 
