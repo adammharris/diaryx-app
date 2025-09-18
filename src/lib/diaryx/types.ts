@@ -25,6 +25,7 @@ export interface DiaryxMetadataOptional {
   this_file_is_root_index?: boolean;
   starred?: boolean;
   pinned?: boolean;
+  visibility_emails?: Record<string, string[]>;
   /**
    * Provides compatibility with Appendix optional properties while allowing unknown key passthrough.
    */

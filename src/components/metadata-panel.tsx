@@ -1,4 +1,4 @@
-import { component$, useSignal, useTask$ } from "@builder.io/qwik";
+import { component$, useSignal, useTask$, $ } from "@builder.io/qwik";
 import type { Signal } from "@builder.io/qwik";
 import yaml from "js-yaml";
 import { stampNoteUpdated } from "../lib/diaryx/note-utils";
@@ -49,7 +49,26 @@ const KNOWN_METADATA_KEYS = new Set<string>([
   "this_file_is_root_index",
   "starred",
   "pinned",
+  "visibility_emails",
 ]);
+
+const VISIBILITY_SPECIAL_TERMS = new Set([
+  "public",
+  "private",
+  "universal",
+  "disposable",
+]);
+
+const toVisibilityArray = (value: string | string[] | undefined): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((item) => item.trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const single = value.trim();
+    return single ? [single] : [];
+  }
+  return [];
+};
 
 const formatExtraValue = (value: unknown): string => {
   if (Array.isArray(value)) {
@@ -91,7 +110,12 @@ const setMetadataField = (
   rawYaml: Signal<string>,
   skipMetadataTimestamp = false
 ) => {
-  (note.metadata as Record<string, unknown>)[key] = value;
+  const target = note.metadata as Record<string, unknown>;
+  if (value === undefined || (Array.isArray(value) && value.length === 0)) {
+    delete target[key as string];
+  } else {
+    target[key as string] = value;
+  }
   stampNoteUpdated(note, { skipMetadata: skipMetadataTimestamp });
   syncFrontmatter(note, rawYaml);
 };
@@ -171,6 +195,9 @@ export const MetadataPanel = component$(() => {
   const activeTab = useSignal<"details" | "raw">("details");
   const rawYaml = useSignal("");
   const yamlError = useSignal<string | undefined>(undefined);
+  const openVisibilityTerm = useSignal<string | "__new__" | null>(null);
+  const newVisibilityTerm = useSignal("");
+  const newVisibilityEmail = useSignal("");
 
   useTask$(({ track }) => {
     track(() => session.activeNoteId);
@@ -178,7 +205,15 @@ export const MetadataPanel = component$(() => {
     if (current) {
       syncFrontmatter(current, rawYaml);
       yamlError.value = undefined;
+      openVisibilityTerm.value = null;
+      newVisibilityTerm.value = "";
+      newVisibilityEmail.value = "";
     }
+  });
+
+  useTask$(({ track }) => {
+    track(() => openVisibilityTerm.value);
+    newVisibilityEmail.value = "";
   });
 
   if (!note) {
@@ -341,7 +376,7 @@ export const MetadataPanel = component$(() => {
               </label>
             </div>
           </label>
-          <label>
+          <div class="visibility-editor">
             <span class="field-heading">
               <span>Visibility</span>
               {missingRequired.has("visibility") && (
@@ -355,18 +390,321 @@ export const MetadataPanel = component$(() => {
                 </span>
               )}
             </span>
-            <textarea
-              value={toList(note.metadata.visibility)}
-              onInput$={(event) =>
-                setMetadataField(
-                  note,
-                  "visibility",
-                  toValue((event.target as HTMLTextAreaElement).value),
-                  rawYaml
+            {(() => {
+              const visibilityList = toVisibilityArray(note.metadata.visibility);
+              const visibilityEmailsMap =
+                (note.metadata.visibility_emails as Record<string, string[]>) ?? {};
+              const suggestionList = Array.from(
+                new Set(
+                  session.notes
+                    .filter((item) => item.id !== note.id)
+                    .flatMap((item) => toVisibilityArray(item.metadata.visibility))
+                    .map((term) => term.trim())
+                    .filter((term) => term.length > 0)
                 )
-              }
-            />
-          </label>
+              )
+                .filter((term) => !visibilityList.includes(term))
+                .slice(0, 8);
+
+              const activeVisibilityTerm =
+                openVisibilityTerm.value && openVisibilityTerm.value !== "__new__"
+                  ? openVisibilityTerm.value
+                  : null;
+              const activeEmails = activeVisibilityTerm
+                ? visibilityEmailsMap[activeVisibilityTerm] ?? []
+                : [];
+              const isActiveSpecial = activeVisibilityTerm
+                ? VISIBILITY_SPECIAL_TERMS.has(activeVisibilityTerm.toLowerCase())
+                : false;
+
+              const updateVisibilityValues = $(
+                (
+                  _event: Event,
+                  values: string[]
+                ) => {
+                  const unique = Array.from(
+                    new Set(values.map((term) => term.trim()).filter(Boolean))
+                  );
+                  if (!unique.length) {
+                    setMetadataField(note, "visibility", "", rawYaml);
+                } else if (unique.length === 1) {
+                  setMetadataField(note, "visibility", unique[0], rawYaml);
+                } else {
+                  setMetadataField(note, "visibility", unique, rawYaml);
+                }
+
+                const emails = note.metadata.visibility_emails
+                  ? { ...(note.metadata.visibility_emails as Record<string, string[]>) }
+                  : undefined;
+                if (emails) {
+                  let changed = false;
+                  for (const key of Object.keys(emails)) {
+                    if (!unique.includes(key)) {
+                      delete emails[key];
+                      changed = true;
+                    }
+                  }
+                  if (changed) {
+                    if (Object.keys(emails).length === 0) {
+                      setMetadataField(note, "visibility_emails", undefined, rawYaml, true);
+                    } else {
+                      setMetadataField(note, "visibility_emails", emails, rawYaml, true);
+                    }
+                  }
+                }
+
+                  if (
+                    openVisibilityTerm.value &&
+                    openVisibilityTerm.value !== "__new__" &&
+                    !unique.includes(openVisibilityTerm.value)
+                  ) {
+                    openVisibilityTerm.value = null;
+                  }
+                }
+              );
+
+              const updateEmailsForTerm = (term: string, emails: string[]) => {
+                const normalizedTerm = term.trim();
+                if (!normalizedTerm) return;
+                const uniqueEmails = Array.from(
+                  new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))
+                );
+                const current = note.metadata.visibility_emails
+                  ? { ...(note.metadata.visibility_emails as Record<string, string[]>) }
+                  : {};
+                if (uniqueEmails.length) {
+                  current[normalizedTerm] = uniqueEmails;
+                } else {
+                  delete current[normalizedTerm];
+                }
+                if (Object.keys(current).length === 0) {
+                  setMetadataField(note, "visibility_emails", undefined, rawYaml, true);
+                } else {
+                  setMetadataField(note, "visibility_emails", current, rawYaml, true);
+                }
+              };
+
+              return (
+                <div class="visibility-controls">
+                  <div class="visibility-badges">
+                    {visibilityList.map((term) => {
+                      const emailCount = visibilityEmailsMap[term]?.length ?? 0;
+                      const isSpecial = VISIBILITY_SPECIAL_TERMS.has(term.toLowerCase());
+                      return (
+                        <div class="visibility-badge-wrapper" key={term}>
+                          <button
+                            type="button"
+                            class="visibility-badge"
+                            data-active={openVisibilityTerm.value === term ? "true" : undefined}
+                            data-special={isSpecial ? "true" : undefined}
+                            onClick$={() => {
+                              openVisibilityTerm.value =
+                                openVisibilityTerm.value === term ? null : term;
+                            }}
+                          >
+                            <span class="badge-label">{term}</span>
+                            {!isSpecial && emailCount > 0 && (
+                              <span class="badge-count">{emailCount}</span>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            class="visibility-remove"
+                            aria-label={`Remove visibility term ${term}`}
+                              onClick$={$(() => {
+                                const next = visibilityList.filter((value) => value !== term);
+                                updateVisibilityValues(undefined as unknown as Event, next);
+                              })}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      class="visibility-add"
+                      onClick$={() => {
+                        openVisibilityTerm.value = "__new__";
+                        newVisibilityTerm.value = "";
+                      }}
+                    >
+                      + Add visibility
+                    </button>
+                  </div>
+                  {openVisibilityTerm.value === "__new__" && (
+                    <div class="visibility-new">
+                      <div class="visibility-new-row">
+                        <input
+                          type="text"
+                          placeholder="Enter visibility term"
+                          value={newVisibilityTerm.value}
+                          onInput$={(event) =>
+                            (newVisibilityTerm.value = (
+                              event.target as HTMLInputElement
+                            ).value)
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick$={$(() => {
+                            const normalized = newVisibilityTerm.value.trim();
+                            if (!normalized) return;
+                            if (visibilityList.includes(normalized)) {
+                              openVisibilityTerm.value = normalized;
+                              newVisibilityTerm.value = "";
+                              return;
+                            }
+                            const next = [...visibilityList, normalized];
+                            updateVisibilityValues(undefined as unknown as Event, next);
+                            openVisibilityTerm.value = normalized;
+                            newVisibilityTerm.value = "";
+                          })}
+                        >
+                          Add term
+                        </button>
+                      </div>
+                      {suggestionList.length > 0 && (
+                        <div class="visibility-suggestions">
+                          <span>Suggestions:</span>
+                          <div class="visibility-suggestion-list">
+                            {suggestionList.map((term) => (
+                              <button
+                                key={term}
+                                type="button"
+                                onClick$={$(() => {
+                                  const normalized = term.trim();
+                                  if (!normalized) return;
+                                  if (visibilityList.includes(normalized)) {
+                                    openVisibilityTerm.value = normalized;
+                                    return;
+                                  }
+                                  const next = [...visibilityList, normalized];
+                                  updateVisibilityValues(undefined as unknown as Event, next);
+                                  openVisibilityTerm.value = normalized;
+                                })}
+                              >
+                                {term}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {activeVisibilityTerm && (
+                    <div class="visibility-term-panel">
+                      <header>
+                        <span class="term-title">{activeVisibilityTerm}</span>
+                        {!isActiveSpecial && (
+                          <span class="term-description">
+                            {activeEmails.length} recipient
+                            {activeEmails.length === 1 ? "" : "s"}
+                          </span>
+                        )}
+                      </header>
+                      {isActiveSpecial ? (
+                        <p class="visibility-term-info">
+                          This is a special Diaryx visibility setting managed by the
+                          platform.
+                        </p>
+                      ) : (
+                        <div class="visibility-term-editor">
+                          <div class="visibility-email-chips">
+                            {activeEmails.length ? (
+                              activeEmails.map((email) => (
+                                <span key={email} class="email-chip">
+                                  {email}
+                                  <button
+                                    type="button"
+                                    aria-label={`Remove ${email}`}
+                                    onClick$={$(() => {
+                                      const current =
+                                        (note.metadata.visibility_emails?.[
+                                          activeVisibilityTerm
+                                        ] as string[] | undefined) ?? [];
+                                      updateEmailsForTerm(
+                                        activeVisibilityTerm,
+                                        current.filter((value) => value !== email)
+                                      );
+                                    })}
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))
+                            ) : (
+                              <p class="visibility-term-hint">No recipients yet.</p>
+                            )}
+                          </div>
+                          <div class="visibility-email-add">
+                            <input
+                              type="email"
+                              placeholder="Add email"
+                              value={newVisibilityEmail.value}
+                              onInput$={(event) =>
+                                (newVisibilityEmail.value = (
+                                  event.target as HTMLInputElement
+                                ).value)
+                              }
+                              onKeyDown$={(event) => {
+                                if ((event as KeyboardEvent).key === "Enter") {
+                                  event.preventDefault();
+                                  const normalizedEmail = newVisibilityEmail.value
+                                    .trim()
+                                    .toLowerCase();
+                                  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+                                    return;
+                                  }
+                                  const current =
+                                    (note.metadata.visibility_emails?.[
+                                      activeVisibilityTerm
+                                    ] as string[] | undefined) ?? [];
+                                  if (current.includes(normalizedEmail)) {
+                                    newVisibilityEmail.value = "";
+                                    return;
+                                  }
+                                  updateEmailsForTerm(activeVisibilityTerm, [
+                                    ...current,
+                                    normalizedEmail,
+                                  ]);
+                                  newVisibilityEmail.value = "";
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick$={$(() => {
+                                const normalizedEmail = newVisibilityEmail.value
+                                  .trim()
+                                  .toLowerCase();
+                                if (!normalizedEmail || !normalizedEmail.includes("@")) return;
+                                const current =
+                                  (note.metadata.visibility_emails?.[
+                                    activeVisibilityTerm
+                                  ] as string[] | undefined) ?? [];
+                                if (current.includes(normalizedEmail)) {
+                                  newVisibilityEmail.value = "";
+                                  return;
+                                }
+                                updateEmailsForTerm(activeVisibilityTerm, [
+                                  ...current,
+                                  normalizedEmail,
+                                ]);
+                                newVisibilityEmail.value = "";
+                              })}
+                            >
+                              Add email
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
           <label>
             <span class="field-heading">
               <span>Format</span>

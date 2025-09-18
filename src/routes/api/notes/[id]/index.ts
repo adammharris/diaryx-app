@@ -19,14 +19,16 @@ export const onDelete: RequestHandler = async (event) => {
   const { request, params } = event;
   const user = await parseUser(request);
   if (!user) {
-    return event.json(401, { error: "UNAUTHORIZED" });
+    event.json(401, { error: "UNAUTHORIZED" });
+    return;
   }
 
   const noteId = params.id;
   if (!noteId) {
-    return event.json(400, { error: "MISSING_NOTE_ID" });
+    event.json(400, { error: "MISSING_NOTE_ID" });
+    return;
   }
 
   await deleteNoteForUser(user.id, noteId);
-  return event.json(200, { status: "deleted" });
+  event.json(200, { status: "deleted" });
 };

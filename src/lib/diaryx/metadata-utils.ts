@@ -38,6 +38,16 @@ const ensureStringOrArray = (value: unknown): string | string[] => {
   return ensureString(value);
 };
 
+const ensureEmailArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => ensureString(item).trim())
+      .filter((item) => item.length > 0);
+  }
+  const single = ensureString(value).trim();
+  return single ? [single] : [];
+};
+
 export const isValuePresent = (value: unknown): boolean => {
   if (value == null) {
     return false;
@@ -61,6 +71,25 @@ export const normalizeDiaryxMetadata = (
   base.visibility = ensureStringOrArray(base.visibility);
   base.format = ensureStringOrArray(base.format);
   base.reachable = ensureStringOrArray(base.reachable);
+
+  if (base.visibility_emails && typeof base.visibility_emails === "object") {
+    const visibilityEmails: Record<string, string[]> = {};
+    for (const [term, emails] of Object.entries(
+      base.visibility_emails as Record<string, unknown>
+    )) {
+      const normalizedTerm = ensureString(term).trim();
+      if (!normalizedTerm) continue;
+      const normalizedEmails = ensureEmailArray(emails).map((email) => email.toLowerCase());
+      if (normalizedEmails.length) {
+        visibilityEmails[normalizedTerm] = Array.from(new Set(normalizedEmails));
+      }
+    }
+    if (Object.keys(visibilityEmails).length) {
+      base.visibility_emails = visibilityEmails;
+    } else {
+      delete base.visibility_emails;
+    }
+  }
 
   const { success, metadata, issues } = validateDiaryxMetadata(base);
 

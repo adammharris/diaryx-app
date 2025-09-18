@@ -824,6 +824,7 @@ input[type="radio"] {
   justify-content: center;
   font-size: 1.1rem;
   cursor: pointer;
+  flex-shrink: 0;
   transition: background 150ms ease, color 150ms ease, transform 150ms ease;
 }
 
@@ -1177,6 +1178,259 @@ input[type="radio"] {
   justify-content: space-between;
   gap: 0.75rem;
   color: inherit;
+}
+
+.metadata-panel .visibility-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.metadata-panel .visibility-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 14px;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.metadata-panel .visibility-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.metadata-panel .visibility-badge-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.metadata-panel .visibility-badge {
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.metadata-panel .visibility-badge[data-active="true"] {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 15%, transparent);
+}
+
+.metadata-panel .visibility-badge[data-special="true"] {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.metadata-panel .badge-label {
+  font-weight: 600;
+}
+
+.metadata-panel .badge-count {
+  font-size: 0.75rem;
+  background: var(--accent-primary);
+  color: var(--accent-on-primary);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+.metadata-panel .visibility-remove {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.metadata-panel .visibility-remove:hover,
+.metadata-panel .visibility-remove:focus-visible {
+  background: rgba(220, 38, 38, 0.14);
+  color: #dc2626;
+}
+
+.metadata-panel .visibility-add {
+  border: 1px dashed var(--surface-border);
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.metadata-panel .visibility-add:hover,
+.metadata-panel .visibility-add:focus-visible {
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  color: var(--accent-primary);
+}
+
+.metadata-panel .visibility-new {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 12px;
+  padding: 0.75rem;
+}
+
+.metadata-panel .visibility-new-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.metadata-panel .visibility-new-row input {
+  flex: 1;
+  border-radius: 10px;
+  border: 1px solid var(--surface-border);
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-elevated);
+}
+
+.metadata-panel .visibility-new-row button {
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-primary);
+  color: var(--accent-on-primary);
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+}
+
+.metadata-panel .visibility-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.metadata-panel .visibility-suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.metadata-panel .visibility-suggestion-list button {
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.metadata-panel .visibility-suggestion-list button:hover,
+.metadata-panel .visibility-suggestion-list button:focus-visible {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.metadata-panel .visibility-term-panel {
+  border-radius: 12px;
+  background: var(--surface-elevated);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.metadata-panel .visibility-term-panel header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.metadata-panel .term-title {
+  font-weight: 600;
+}
+
+.metadata-panel .term-description {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.metadata-panel .visibility-term-info {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.metadata-panel .visibility-term-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.metadata-panel .visibility-email-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.metadata-panel .visibility-term-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.metadata-panel .email-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.metadata-panel .email-chip button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.metadata-panel .email-chip button:hover,
+.metadata-panel .email-chip button:focus-visible {
+  color: #dc2626;
+}
+
+.metadata-panel .visibility-email-add {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.metadata-panel .visibility-email-add input {
+  flex: 1;
+  border-radius: 10px;
+  border: 1px solid var(--surface-border);
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-elevated);
+}
+
+.metadata-panel .visibility-email-add button {
+  border: none;
+  border-radius: 10px;
+  padding: 0.5rem 0.85rem;
+  background: var(--accent-primary);
+  color: var(--accent-on-primary);
+  cursor: pointer;
 }
 
 .metadata-panel .field-warning {

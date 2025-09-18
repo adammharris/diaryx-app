@@ -52,7 +52,7 @@ export const AuthSection = component$(() => {
           name: name.value,
         },
         {
-          onError: (ctx) => {
+          onError: (ctx: any) => {
             errorMessage.value = ctx.error?.message ?? "Unable to sign up.";
           },
           onSuccess: async () => {
@@ -68,7 +68,7 @@ export const AuthSection = component$(() => {
                 error instanceof Error ? error.message : "Unable to sync notes.";
             }
           },
-        }
+        } as any
       );
     } catch (error) {
       if (!errorMessage.value) {
@@ -93,7 +93,7 @@ export const AuthSection = component$(() => {
           password: password.value,
         },
         {
-          onError: (ctx) => {
+          onError: (ctx: any) => {
             errorMessage.value = ctx.error?.message ?? "Invalid credentials.";
           },
           onSuccess: async () => {
@@ -106,7 +106,7 @@ export const AuthSection = component$(() => {
                 error instanceof Error ? error.message : "Unable to sync notes.";
             }
           },
-        }
+        } as any
       );
     } catch (error) {
       if (!errorMessage.value) {
@@ -121,14 +121,14 @@ export const AuthSection = component$(() => {
     resetMessages();
     isLoading.value = true;
     try {
-      await authClient.signOut({
-        onError: (ctx) => {
+      await authClient.signOut(undefined, {
+        onError: (ctx: any) => {
           errorMessage.value = ctx.error?.message ?? "Unable to sign out.";
         },
         onSuccess: () => {
           successMessage.value = "Signed out.";
         },
-      });
+      } as any);
     } catch (error) {
       if (!errorMessage.value) {
         errorMessage.value = error instanceof Error ? error.message : "Unable to sign out.";

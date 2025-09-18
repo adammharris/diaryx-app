@@ -7,7 +7,6 @@ const rfc3339Regex =
 const stringOrArray = z.union([z.string(), z.array(z.string().min(1)).min(1)]);
 const optionalStringOrArray = stringOrArray.optional();
 const optionalBoolean = z.boolean().optional();
-
 export const DiaryxMetadataSchema = z
   .object({
     title: z.string().min(1, "title is required"),
@@ -37,6 +36,9 @@ export const DiaryxMetadataSchema = z
     this_file_is_root_index: optionalBoolean,
     starred: optionalBoolean,
     pinned: optionalBoolean,
+    visibility_emails: z
+      .record(z.string().min(1), z.array(z.string().email()).min(1))
+      .optional(),
   })
   .passthrough();
 
@@ -49,4 +51,3 @@ export const coerceMetadata = (data: unknown): DiaryxMetadata => {
   }
   return parseResult.data as DiaryxMetadata;
 };
-

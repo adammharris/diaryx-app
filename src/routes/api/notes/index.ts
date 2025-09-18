@@ -2,8 +2,9 @@ import type { RequestEvent, RequestHandler } from "@builder.io/qwik-city";
 import { auth } from "~/lib/auth";
 import { listNotesForUser, upsertNotesForUser } from "~/lib/server/note-storage";
 
-const respondUnauthorized = (event: RequestEvent) =>
+const respondUnauthorized = (event: RequestEvent): void => {
   event.json(401, { error: "UNAUTHORIZED" });
+};
 
 const parseUser = async (request: Request) => {
   try {
@@ -21,10 +22,13 @@ const parseUser = async (request: Request) => {
 export const onGet: RequestHandler = async (event) => {
   const { request } = event;
   const user = await parseUser(request);
-  if (!user) return respondUnauthorized(event);
+  if (!user) {
+    respondUnauthorized(event);
+    return;
+  }
 
   const rows = await listNotesForUser(user.id);
-  return event.json(200, {
+  event.json(200, {
     notes: rows.map((row) => ({
       id: row.id,
       markdown: row.markdown,
@@ -37,13 +41,17 @@ export const onGet: RequestHandler = async (event) => {
 export const onPost: RequestHandler = async (event) => {
   const { request } = event;
   const user = await parseUser(request);
-  if (!user) return respondUnauthorized(event);
+  if (!user) {
+    respondUnauthorized(event);
+    return;
+  }
 
   let payload: unknown;
   try {
     payload = await request.json();
   } catch (error) {
-    return event.json(400, { error: "INVALID_JSON" });
+    event.json(400, { error: "INVALID_JSON" });
+    return;
   }
 
   const notes = Array.isArray((payload as any)?.notes)
@@ -72,7 +80,7 @@ export const onPost: RequestHandler = async (event) => {
   }
 
   const rows = await listNotesForUser(user.id);
-  return event.json(200, {
+  event.json(200, {
     notes: rows.map((row) => ({
       id: row.id,
       markdown: row.markdown,

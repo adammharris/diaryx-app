@@ -8,7 +8,7 @@ interface SyncInputNote {
   lastModified?: number;
 }
 
-interface DbNote {
+export interface DbNote {
   id: string;
   markdown: string;
   source_name: string | null;
@@ -36,7 +36,7 @@ const ensureNotesTable = async (pool: Pool) => {
   tableEnsured = true;
 };
 
-export const listNotesForUser = async (userId: string) => {
+export const listNotesForUser = async (userId: string): Promise<DbNote[]> => {
   await ensureNotesTable(dbPool);
   const result = await dbPool.query<DbNote>(
     `SELECT id, markdown, source_name, last_modified
