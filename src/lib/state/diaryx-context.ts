@@ -34,6 +34,7 @@ export interface DiaryxSessionState {
   exportState: {
     isExporting: boolean;
     lastSuccessAt?: number;
+    lastSuccessFormat?: "html" | "markdown";
   };
   sharedVisibilityEmails: Record<string, string[]>;
   sharedNotes: DiaryxNote[];

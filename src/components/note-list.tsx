@@ -190,6 +190,7 @@ export const NoteList = component$(() => {
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
       session.exportState.lastSuccessAt = Date.now();
+      session.exportState.lastSuccessFormat = format;
     } finally {
       session.exportState.isExporting = false;
     }
@@ -316,8 +317,8 @@ export const NoteList = component$(() => {
               handleExportChange(value);
             }}
           >
-            <option value="" disabled>
-              What format?
+            <option value="" disabled selected={!exportFormatSignal.value}>
+              Export
             </option>
             <option value="html">Export HTML</option>
             <option value="markdown">Export Markdown</option>
@@ -342,7 +343,13 @@ export const NoteList = component$(() => {
           <p class="status error">{session.importState.lastError}</p>
         )}
         {session.exportState.lastSuccessAt && (
-          <p class="status success">Exported ✓</p>
+          <p class="status success">
+            {`Exported${
+              session.exportState.lastSuccessFormat
+                ? ` ${session.exportState.lastSuccessFormat.toUpperCase()}`
+                : ""
+            } ✓`}
+          </p>
         )}
       </header>
       <input

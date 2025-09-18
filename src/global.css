@@ -214,6 +214,13 @@ input[type="radio"] {
 
 .note-list header .actions .export-select {
   appearance: none;
+  text-align: center;
+  -moz-text-align-last: center;
+  text-align-last: center;
+}
+.note-list header .actions .export-select option {
+  color: var(--text-primary);
+  text-align: left;
 }
 
 .note-list header .actions button:hover:not(:disabled),

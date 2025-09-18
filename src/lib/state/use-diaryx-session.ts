@@ -31,6 +31,7 @@ const createInitialState = (): DiaryxSessionState => {
     exportState: {
       isExporting: false,
       lastSuccessAt: undefined,
+      lastSuccessFormat: undefined,
     },
     sharedVisibilityEmails: {},
     sharedNotes: [],
