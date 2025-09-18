@@ -198,6 +198,13 @@ input[type="radio"] {
     box-shadow 160ms ease;
 }
 
+.note-list header .actions button.active {
+  background: var(--accent-primary);
+  color: var(--accent-on-primary);
+  border-color: color-mix(in srgb, var(--accent-on-primary) 65%, transparent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
 .note-list header .actions .export-select {
   appearance: none;
 }
@@ -777,6 +784,22 @@ input[type="radio"] {
   gap: 0.45rem;
 }
 
+.note-list .note-items .note-empty {
+  display: block;
+  width: 100%;
+  padding: 1.1rem 1.5rem;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  text-align: center;
+  border-radius: 16px;
+  background: var(--surface-glass);
+}
+
+.note-list .note-items .note-empty + li {
+  margin-top: 0.35rem;
+}
+
 .note-list li .note-open {
   width: 100%;
   border: none;
@@ -844,6 +867,12 @@ input[type="radio"] {
 .note-list .title {
   font-size: 1rem;
   letter-spacing: -0.01em;
+}
+
+.note-list .shared-author {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .note-list .preview {
@@ -1536,6 +1565,88 @@ input[type="radio"] {
   font-size: 0.9rem;
   color: var(--text-primary);
   outline: none;
+}
+
+.metadata-panel .details.readonly {
+  padding: 1rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  overflow-y: auto;
+  flex: 1;
+  font-size: 0.85rem;
+}
+
+.metadata-panel .metadata-readonly {
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.metadata-panel .metadata-readonly > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.metadata-panel .metadata-readonly dt {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.metadata-panel .metadata-readonly dd {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.metadata-panel .readonly-visibility {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.metadata-panel .readonly-visibility li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.metadata-panel .readonly-visibility .visibility-term {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.metadata-panel .readonly-visibility .visibility-emails {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.metadata-panel .details.readonly .additional-properties.readonly {
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid var(--surface-border);
+}
+
+.metadata-panel .raw-editor.readonly textarea {
+  background: var(--surface-base);
+  border: 1px solid var(--surface-border);
+  color: var(--text-secondary);
+  cursor: default;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px transparent;
+}
+
+.metadata-panel .raw-editor.readonly textarea:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .metadata-panel .raw-editor .error {
