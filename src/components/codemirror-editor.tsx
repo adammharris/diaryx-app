@@ -34,6 +34,7 @@ export const CodeMirrorEditor = component$(
     const readOnlyCompartmentSignal = useSignal<any>();
     const editableCompartmentSignal = useSignal<any>();
     const editorViewCtorSignal = useSignal<any>();
+    const isApplyingExternalChange = useSignal(false);
 
     // eslint-disable-next-line qwik/no-use-visible-task
     useVisibleTask$(async ({ track, cleanup }) => {
@@ -43,21 +44,39 @@ export const CodeMirrorEditor = component$(
       const parent = track(() => containerRef.value);
       if (!parent) return;
       if (editorViewSignal.value) return;
+      // Delay init until container is laid out/visible to avoid zero-height render
+      let attempts = 0;
+      while (attempts < 10) {
+        const rect = parent.getBoundingClientRect?.();
+        const visible =
+          rect &&
+          rect.width > 4 &&
+          rect.height > 4 &&
+          document.body.contains(parent);
+        if (visible) break;
+        await new Promise((r) => requestAnimationFrame(r));
+        attempts++;
+      }
 
-      const [stateModule, markdownModule, languageModule, commandsModule, viewModule] =
-        await Promise.all([
-          import("@codemirror/state"),
-          import("@codemirror/lang-markdown"),
-          import("@codemirror/language"),
-          import("@codemirror/commands"),
-          import("@codemirror/view"),
-        ]);
+      const [
+        stateModule,
+        markdownModule,
+        languageModule,
+        commandsModule,
+        viewModule,
+      ] = await Promise.all([
+        import("@codemirror/state"),
+        import("@codemirror/lang-markdown"),
+        import("@codemirror/language"),
+        import("@codemirror/commands"),
+        import("@codemirror/view"),
+      ]);
 
       const { EditorState, Compartment } = stateModule;
-      const { markdown, markdownLanguage } = markdownModule;
+      const { markdown, markdownLanguage, markdownKeymap } = markdownModule;
       const { syntaxHighlighting, defaultHighlightStyle } = languageModule;
-      const { history } = commandsModule;
-      const { EditorView } = viewModule;
+      const { history, defaultKeymap, historyKeymap } = commandsModule;
+      const { EditorView, keymap } = viewModule;
 
       const themeCompartment = new Compartment();
       const readOnlyCompartment = new Compartment();
@@ -71,6 +90,7 @@ export const CodeMirrorEditor = component$(
 
       const baseExtensions = [
         history(),
+        keymap.of([...defaultKeymap, ...historyKeymap, ...markdownKeymap]),
         markdown({ base: markdownLanguage }),
         EditorView.lineWrapping,
         EditorState.allowMultipleSelections.of(true),
@@ -79,7 +99,7 @@ export const CodeMirrorEditor = component$(
         themeCompartment.of(defaultTheme(EditorView)),
         editableCompartment.of(EditorView.editable.of(!readOnly)),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
+          if (update.docChanged && !isApplyingExternalChange.value) {
             onChange$(update.state.doc.toString());
           }
         }),
@@ -121,13 +141,18 @@ export const CodeMirrorEditor = component$(
       if (!view) return;
       const current = view.state.doc.toString();
       if (nextValue === current) return;
+      // Apply external value without losing selection/focus
+      const sel = view.state.selection.main;
+      isApplyingExternalChange.value = true;
       view.dispatch({
-        changes: {
-          from: 0,
-          to: current.length,
-          insert: nextValue,
+        changes: { from: 0, to: current.length, insert: nextValue },
+        selection: {
+          anchor: Math.min(sel.anchor, nextValue.length),
+          head: Math.min(sel.head, nextValue.length),
         },
+        scrollIntoView: true,
       });
+      isApplyingExternalChange.value = false;
     });
 
     // eslint-disable-next-line qwik/no-use-visible-task
@@ -182,7 +207,7 @@ export const CodeMirrorEditor = component$(
         )}
       </div>
     );
-  }
+  },
 );
 
 const defaultTheme = (EditorView: any) =>
@@ -202,7 +227,7 @@ const defaultTheme = (EditorView: any) =>
         padding: "1.25rem 1.5rem",
       },
     },
-    { dark: false }
+    { dark: false },
   );
 
 const livePreviewTheme = (EditorView: any) =>
@@ -214,14 +239,43 @@ const livePreviewTheme = (EditorView: any) =>
         height: "100%",
       },
       ".cm-scroller": {
+        fontFamily:
+          '"SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif',
         lineHeight: "1.5",
-        fontSize: "1.05rem",
+        fontSize: "1.08rem",
         paddingBottom: "4rem",
+        letterSpacing: "-0.003em",
       },
       ".cm-content": {
-        padding: "1.5rem 2rem",
-        maxWidth: "72ch",
+        padding: "1.65rem clamp(1.4rem, 4vw, 2.2rem)",
+        maxWidth: "68ch",
+        margin: "0 auto",
+      },
+      /* Live styling enhancements */
+      ".cm-line": {
+        padding: "0.1rem 0",
+      },
+      ".cm-strong": {
+        fontWeight: "700",
+      },
+      ".cm-em": {
+        fontStyle: "italic",
+      },
+      ".cm-inline-code": {
+        fontFamily: CODE_FONT_STACK,
+        backgroundColor:
+          "color-mix(in srgb, var(--surface-border) 35%, transparent)",
+        padding: "0.1rem 0.35rem",
+        borderRadius: "0.35rem",
+      },
+      ".cm-quote": {
+        borderLeft: "3px solid var(--surface-border-strong)",
+        paddingLeft: "0.75rem",
+        color: "var(--text-secondary)",
+      },
+      ".cm-formatting": {
+        opacity: "0.35",
       },
     },
-    { dark: false }
+    { dark: false },
   );
