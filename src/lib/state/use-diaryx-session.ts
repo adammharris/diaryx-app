@@ -22,6 +22,7 @@ const createInitialState = (): DiaryxSessionState => {
       showCommandPalette: false,
       editorMode: "split",
       showSettings: false,
+      libraryMode: "all",
     },
     importState: {
       isImporting: false,
@@ -32,6 +33,14 @@ const createInitialState = (): DiaryxSessionState => {
       lastSuccessAt: undefined,
     },
     sharedVisibilityEmails: {},
+    sharedNotes: [],
+    sharedActiveNoteId: undefined,
+    sharedNotesState: {
+      isLoading: false,
+      lastError: undefined,
+      isUnauthorized: false,
+      lastFetchedAt: undefined,
+    },
   };
 };
 

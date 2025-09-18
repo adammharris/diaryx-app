@@ -103,6 +103,17 @@ const toValue = (value: string): string | string[] => {
   return parts.length <= 1 ? (parts.at(0) ?? "") : parts;
 };
 
+const toInlineList = (value: string | string[] | undefined): string => {
+  if (!value) return "";
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item.trim() : String(item ?? "").trim()))
+      .filter(Boolean)
+      .join(", ");
+  }
+  return value;
+};
+
 const normalizeEmailList = (emails: unknown): string[] => {
   if (!Array.isArray(emails)) {
     return [];
@@ -215,7 +226,12 @@ const toggleAutoUpdate = (
 
 export const MetadataPanel = component$(() => {
   const session = useDiaryxSession();
-  const note = session.notes.find((item) => item.id === session.activeNoteId);
+  const libraryMode = session.ui.libraryMode;
+  const note =
+    libraryMode === "shared"
+      ? session.sharedNotes.find((item) => item.id === session.sharedActiveNoteId)
+      : session.notes.find((item) => item.id === session.activeNoteId);
+  const isSharedView = libraryMode === "shared";
   const activeTab = useSignal<"details" | "raw">("details");
   const rawYaml = useSignal("");
   const yamlError = useSignal<string | undefined>(undefined);
@@ -226,7 +242,7 @@ export const MetadataPanel = component$(() => {
   if (!note) {
     return (
       <aside class="metadata-panel empty">
-        <p>No note selected.</p>
+        <p>{isSharedView ? "No shared note selected." : "No note selected."}</p>
       </aside>
     );
   }
@@ -279,6 +295,26 @@ export const MetadataPanel = component$(() => {
   });
 
   useTask$(({ track }) => {
+    const mode = track(() => session.ui.libraryMode);
+    if (mode === "shared") {
+      track(() => session.sharedActiveNoteId);
+      track(() => session.sharedNotes.length);
+      track(() => session.sharedNotesState.lastFetchedAt);
+      const current = session.sharedNotes.find(
+        (item) => item.id === session.sharedActiveNoteId
+      );
+      if (current) {
+        rawYaml.value = current.frontmatter ?? formatYaml(current.metadata);
+      } else {
+        rawYaml.value = "";
+      }
+      yamlError.value = undefined;
+      openVisibilityTerm.value = null;
+      newVisibilityTerm.value = "";
+      newVisibilityEmail.value = "";
+      return;
+    }
+
     track(() => session.activeNoteId);
     const current = session.notes.find((item) => item.id === session.activeNoteId);
     if (current) {
@@ -307,6 +343,11 @@ export const MetadataPanel = component$(() => {
   });
 
   useTask$(({ track }) => {
+    track(() => session.ui.libraryMode);
+    if (session.ui.libraryMode === "shared") {
+      newVisibilityEmail.value = "";
+      return;
+    }
     track(() => openVisibilityTerm.value);
     newVisibilityEmail.value = "";
   });
@@ -315,6 +356,148 @@ export const MetadataPanel = component$(() => {
     return (
       <aside class="metadata-panel empty">
         <p>No note selected.</p>
+      </aside>
+    );
+  }
+
+  if (isSharedView) {
+    const visibilityList = toVisibilityArray(note.metadata.visibility);
+    const visibilityEmailsMap =
+      (note.metadata.visibility_emails as Record<string, string[]>) ?? {};
+    const extraEntries = Object.entries(note.metadata).filter(
+      ([key]) => !KNOWN_METADATA_KEYS.has(key)
+    );
+    const authorDisplay = toInlineList(note.metadata.author);
+    const formatDisplay = toInlineList(note.metadata.format);
+    const reachableDisplay = toInlineList(note.metadata.reachable);
+    const tagsDisplay = Array.isArray(note.metadata.tags)
+      ? note.metadata.tags.join(", ")
+      : "";
+    const aliasesDisplay = Array.isArray(note.metadata.aliases)
+      ? note.metadata.aliases.join(", ")
+      : "";
+
+    return (
+      <aside
+        class={{ "metadata-panel": true, collapsed: !session.ui.showMetadata }}
+        aria-hidden={session.ui.showMetadata ? "false" : "true"}
+      >
+        <header>
+          <h2>Info</h2>
+          <div class="tabs">
+            <button
+              type="button"
+              class={{ active: activeTab.value === "details" }}
+              onClick$={() => (activeTab.value = "details")}
+            >
+              Details
+            </button>
+            <button
+              type="button"
+              class={{ active: activeTab.value === "raw" }}
+              onClick$={() => (activeTab.value = "raw")}
+            >
+              YAML
+            </button>
+          </div>
+        </header>
+        {activeTab.value === "details" ? (
+          <div class="details readonly">
+            <dl class="metadata-readonly">
+              <div>
+                <dt>Title</dt>
+                <dd>{note.metadata.title}</dd>
+              </div>
+              <div>
+                <dt>Author</dt>
+                <dd>{authorDisplay || "—"}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{note.metadata.created || "—"}</dd>
+              </div>
+              <div>
+                <dt>Updated</dt>
+                <dd>{note.metadata.updated || "—"}</dd>
+              </div>
+              <div>
+                <dt>Visibility</dt>
+                <dd>
+                  {visibilityList.length ? (
+                    <ul class="readonly-visibility">
+                      {visibilityList.map((term) => {
+                        const emails = visibilityEmailsMap[term] ?? [];
+                        return (
+                          <li key={term}>
+                            <span class="visibility-term">{term}</span>
+                            {emails.length > 0 && (
+                              <span class="visibility-emails">{emails.join(", ")}</span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <span>None</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Format</dt>
+                <dd>{formatDisplay || "—"}</dd>
+              </div>
+              <div>
+                <dt>Reachable</dt>
+                <dd>{reachableDisplay || "—"}</dd>
+              </div>
+              <div>
+                <dt>Tags</dt>
+                <dd>{tagsDisplay || "—"}</dd>
+              </div>
+              <div>
+                <dt>Aliases</dt>
+                <dd>{aliasesDisplay || "—"}</dd>
+              </div>
+              {note.metadata.this_file_is_root_index !== undefined && (
+                <div>
+                  <dt>Root index</dt>
+                  <dd>{note.metadata.this_file_is_root_index ? "Yes" : "No"}</dd>
+                </div>
+              )}
+              {note.metadata.starred !== undefined && (
+                <div>
+                  <dt>Starred</dt>
+                  <dd>{note.metadata.starred ? "Yes" : "No"}</dd>
+                </div>
+              )}
+              {note.metadata.pinned !== undefined && (
+                <div>
+                  <dt>Pinned</dt>
+                  <dd>{note.metadata.pinned ? "Yes" : "No"}</dd>
+                </div>
+              )}
+            </dl>
+            {extraEntries.length > 0 && (
+              <section class="additional-properties readonly">
+                <header>
+                  <h3>Additional properties</h3>
+                </header>
+                <ul>
+                  {extraEntries.map(([key, value]) => (
+                    <li key={key}>
+                      <span class="extra-key">{key}</span>
+                      <span class="extra-value">{formatExtraValue(value)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+        ) : (
+          <div class="raw-editor readonly">
+            <textarea value={rawYaml.value} readOnly />
+          </div>
+        )}
       </aside>
     );
   }

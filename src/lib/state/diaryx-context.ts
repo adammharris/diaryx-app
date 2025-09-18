@@ -3,6 +3,7 @@ import type { DiaryxNote } from "../diaryx/types";
 
 export type ThemePreference = "system" | "light" | "dark";
 export type ColorAccent = "violet" | "blue" | "teal" | "amber";
+export type LibraryMode = "all" | "shared";
 
 export interface DiaryxUiState {
   theme: ThemePreference;
@@ -15,6 +16,7 @@ export interface DiaryxUiState {
   showCommandPalette: boolean;
   editorMode: "split" | "source" | "preview" | "live";
   showSettings: boolean;
+  libraryMode: LibraryMode;
 }
 
 export interface DiaryxSessionState {
@@ -34,6 +36,14 @@ export interface DiaryxSessionState {
     lastSuccessAt?: number;
   };
   sharedVisibilityEmails: Record<string, string[]>;
+  sharedNotes: DiaryxNote[];
+  sharedActiveNoteId?: string;
+  sharedNotesState: {
+    isLoading: boolean;
+    lastError?: string;
+    isUnauthorized?: boolean;
+    lastFetchedAt?: number;
+  };
 }
 
 export const DiaryxSessionContext = createContextId<DiaryxSessionState>(

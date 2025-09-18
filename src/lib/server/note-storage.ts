@@ -15,6 +15,10 @@ export interface DbNote {
   last_modified: string | number;
 }
 
+export interface DbSharedNote extends DbNote {
+  user_id: string;
+}
+
 let tableEnsured = false;
 
 const ensureNotesTable = async (pool: Pool) => {
@@ -122,4 +126,18 @@ export const updateVisibilityTermsForUser = async (
     )
   );
   await Promise.all(insertPromises);
+};
+
+export const listNotesSharedWithEmail = async (
+  email: string
+): Promise<DbSharedNote[]> => {
+  await ensureNotesTable(dbPool);
+  const result = await dbPool.query<DbSharedNote>(
+    `SELECT user_id, id, markdown, source_name, last_modified
+       FROM diaryx_note
+      WHERE markdown ILIKE '%' || $1 || '%'
+      ORDER BY updated_at DESC` ,
+    [email]
+  );
+  return result.rows;
 };

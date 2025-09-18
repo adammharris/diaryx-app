@@ -17,6 +17,7 @@ import { AuthSection } from "./settings/auth-section";
 import { createDiaryxRepository } from "../lib/persistence/diaryx-repository";
 import { persistMarkdownNotes } from "../lib/persistence/markdown-store";
 import { deleteNoteOnServer } from "../lib/sync/note-sync";
+import { fetchSharedNotes, SharedNotesError } from "../lib/api/shared-notes";
 
 export const NoteList = component$(() => {
   const session = useDiaryxSession();
@@ -58,11 +59,29 @@ export const NoteList = component$(() => {
     { value: "amber", label: "Amber" },
   ];
 
+  const authorLabel = (value: string | string[] | undefined): string => {
+    if (!value) return "";
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => (typeof item === "string" ? item.trim() : String(item ?? "").trim()))
+        .filter(Boolean)
+        .join(", ");
+    }
+    return value;
+  };
+
   const handleSelect = $((noteId: string) => {
-    session.activeNoteId = noteId;
+    if (session.ui.libraryMode === "shared") {
+      session.sharedActiveNoteId = noteId;
+    } else {
+      session.activeNoteId = noteId;
+    }
   });
 
   const handleCreateNote = $(() => {
+    if (session.ui.libraryMode === "shared") {
+      session.ui.libraryMode = "all";
+    }
     const newNote = createBlankNote();
     session.notes.unshift(newNote);
     session.activeNoteId = newNote.id;
@@ -100,6 +119,49 @@ export const NoteList = component$(() => {
       }
     }
   );
+
+  const loadSharedNotes = $(async () => {
+    session.sharedNotesState.isLoading = true;
+    session.sharedNotesState.lastError = undefined;
+    session.sharedNotesState.isUnauthorized = false;
+    try {
+      const notes = await fetchSharedNotes();
+      session.sharedNotes.splice(0, session.sharedNotes.length, ...notes);
+      session.sharedNotesState.lastFetchedAt = Date.now();
+      const existingActiveId = session.sharedActiveNoteId;
+      if (existingActiveId && notes.find((note) => note.id === existingActiveId)) {
+        session.sharedActiveNoteId = existingActiveId;
+      } else {
+        session.sharedActiveNoteId = notes[0]?.id;
+      }
+    } catch (error) {
+      session.sharedNotes.splice(0, session.sharedNotes.length);
+      session.sharedActiveNoteId = undefined;
+      if (error instanceof SharedNotesError && error.status === 401) {
+        session.sharedNotesState.isUnauthorized = true;
+      } else if (error instanceof Error) {
+        session.sharedNotesState.lastError = error.message;
+      } else {
+        session.sharedNotesState.lastError = "Unable to load shared notes.";
+      }
+    } finally {
+      session.sharedNotesState.isLoading = false;
+    }
+  });
+
+  const handleToggleShared = $(async () => {
+    if (session.ui.libraryMode === "shared") {
+      session.ui.libraryMode = "all";
+      return;
+    }
+    session.ui.libraryMode = "shared";
+    if (!session.sharedNotes.length && !session.sharedNotesState.isLoading) {
+      await loadSharedNotes();
+    }
+    if (!session.sharedActiveNoteId && session.sharedNotes.length) {
+      session.sharedActiveNoteId = session.sharedNotes[0].id;
+    }
+  });
 
   const handleExportActive = $(async (format: "html" | "markdown") => {
     const note = session.notes.find((item) => item.id === session.activeNoteId);
@@ -192,13 +254,17 @@ export const NoteList = component$(() => {
     }
   });
 
-  const filteredNotes = session.notes.filter((note) => {
-    const query = querySignal.value.toLowerCase();
-    if (!query) return true;
-    return (
-      note.metadata.title.toLowerCase().includes(query) ||
-      note.body.toLowerCase().includes(query)
-    );
+  const libraryMode = session.ui.libraryMode;
+  const activeCollection = libraryMode === "shared" ? session.sharedNotes : session.notes;
+  const searchQuery = querySignal.value.trim().toLowerCase();
+  const filteredNotes = activeCollection.filter((note) => {
+    if (!searchQuery) return true;
+    const titleMatch = String(note.metadata.title ?? "")
+      .toLowerCase()
+      .includes(searchQuery);
+    const bodyMatch = note.body.toLowerCase().includes(searchQuery);
+    const authorMatch = authorLabel(note.metadata.author).toLowerCase().includes(searchQuery);
+    return titleMatch || bodyMatch || authorMatch;
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task
@@ -231,11 +297,18 @@ export const NoteList = component$(() => {
           >
             Import
           </button>
+          <button
+            type="button"
+            class={{ active: session.ui.libraryMode === "shared" }}
+            onClick$={handleToggleShared}
+          >
+            Shared
+          </button>
           <select
             aria-label="Export note"
             class="export-select"
             value={exportFormatSignal.value}
-            disabled={!session.activeNoteId}
+            disabled={session.ui.libraryMode === "shared" || !session.activeNoteId}
             onChange$={(event) => {
               const target = event.target as HTMLSelectElement;
               const value = target.value as "" | "html" | "markdown";
@@ -281,9 +354,27 @@ export const NoteList = component$(() => {
         onChange$={(event) => handleImport((event.target as HTMLInputElement).files)}
       />
       <ul class="note-items">
+        {libraryMode === "shared" && session.sharedNotesState.isLoading && (
+          <li class="note-empty">Loading shared notes…</li>
+        )}
+        {libraryMode === "shared" &&
+          !session.sharedNotesState.isLoading &&
+          session.sharedNotesState.isUnauthorized && (
+            <li class="note-empty">Sign in to view shared notes.</li>
+          )}
+        {libraryMode === "shared" &&
+          !session.sharedNotesState.isLoading &&
+          !session.sharedNotesState.isUnauthorized &&
+          session.sharedNotesState.lastError && (
+            <li class="note-empty">{session.sharedNotesState.lastError}</li>
+          )}
         {filteredNotes.map((note) => {
-          const isActive = session.activeNoteId === note.id;
+          const isActive =
+            libraryMode === "shared"
+              ? session.sharedActiveNoteId === note.id
+              : session.activeNoteId === note.id;
           const preview = note.body.split("\n")[0]?.slice(0, 80) ?? "";
+          const author = authorLabel(note.metadata.author);
           return (
             <li key={note.id} class={{ active: isActive }}>
               <button
@@ -291,21 +382,35 @@ export const NoteList = component$(() => {
                 class="note-open"
                 onClick$={() => handleSelect(note.id)}
               >
-                <span class="title">{note.metadata.title}</span>
+                <span class="title">
+                  {note.metadata.title}
+                  {libraryMode === "shared" && author && (
+                    <span class="shared-author"> — {author}</span>
+                  )}
+                </span>
                 <span class="preview">{preview}</span>
               </button>
-              <button
-                type="button"
-                class="note-delete"
-                aria-label="Delete note"
-                title="Delete note"
-                onClick$={(event) => handleDeleteNote(note.id, event)}
-              >
-                ×
-              </button>
+              {libraryMode !== "shared" && (
+                <button
+                  type="button"
+                  class="note-delete"
+                  aria-label="Delete note"
+                  title="Delete note"
+                  onClick$={(event) => handleDeleteNote(note.id, event)}
+                >
+                  ×
+                </button>
+              )}
             </li>
           );
         })}
+        {libraryMode === "shared" &&
+          !session.sharedNotesState.isLoading &&
+          !session.sharedNotesState.isUnauthorized &&
+          !session.sharedNotesState.lastError &&
+          !filteredNotes.length && (
+            <li class="note-empty">No shared notes yet.</li>
+          )}
       </ul>
       {session.ui.showSettings && (
         <div
