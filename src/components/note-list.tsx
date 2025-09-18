@@ -26,6 +26,7 @@ export const NoteList = component$(() => {
   const exportFormatSignal = useSignal("");
   const accountSectionOpen = useSignal(false);
   const displaySectionOpen = useSignal(false);
+  const noteListRef = useSignal<HTMLElement>();
 
   const themeOptions: ReadonlyArray<{
     value: ThemePreference;
@@ -284,10 +285,29 @@ export const NoteList = component$(() => {
     cleanup(() => window.removeEventListener("keydown", handleKeyDown));
   });
 
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track }) => {
+    track(() => session.ui.showLibrary);
+    if (!session.ui.showLibrary) {
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 900px)");
+    if (!media.matches) return;
+    const target = noteListRef.value;
+    if (!target) return;
+    window.requestAnimationFrame(() => {
+      target.focus({ preventScroll: true });
+    });
+  });
+
   return (
     <aside
       class={{ "note-list": true, collapsed: !session.ui.showLibrary }}
       aria-hidden={session.ui.showLibrary ? "false" : "true"}
+      id="library-drawer"
+      tabIndex={-1}
+      ref={noteListRef}
     >
       <header>
         <div class="actions">

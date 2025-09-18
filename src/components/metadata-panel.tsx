@@ -1,4 +1,4 @@
-import { component$, useSignal, useTask$, $ } from "@builder.io/qwik";
+import { component$, useSignal, useTask$, $, useVisibleTask$ } from "@builder.io/qwik";
 import type { Signal } from "@builder.io/qwik";
 import yaml from "js-yaml";
 import { stampNoteUpdated } from "../lib/diaryx/note-utils";
@@ -238,10 +238,17 @@ export const MetadataPanel = component$(() => {
   const openVisibilityTerm = useSignal<string | "__new__" | null>(null);
   const newVisibilityTerm = useSignal("");
   const newVisibilityEmail = useSignal("");
+  const panelRef = useSignal<HTMLElement>();
 
   if (!note) {
     return (
-      <aside class="metadata-panel empty">
+      <aside
+        class="metadata-panel empty"
+        aria-hidden={session.ui.showMetadata ? "false" : "true"}
+        id="metadata-drawer"
+        tabIndex={-1}
+        ref={panelRef}
+      >
         <p>{isSharedView ? "No shared note selected." : "No note selected."}</p>
       </aside>
     );
@@ -352,9 +359,29 @@ export const MetadataPanel = component$(() => {
     newVisibilityEmail.value = "";
   });
 
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track }) => {
+    track(() => session.ui.showMetadata);
+    if (!session.ui.showMetadata) return;
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 900px)");
+    if (!media.matches) return;
+    const target = panelRef.value;
+    if (!target) return;
+    window.requestAnimationFrame(() => {
+      target.focus({ preventScroll: true });
+    });
+  });
+
   if (!note) {
     return (
-      <aside class="metadata-panel empty">
+      <aside
+        class="metadata-panel empty"
+        aria-hidden={session.ui.showMetadata ? "false" : "true"}
+        id="metadata-drawer"
+        tabIndex={-1}
+        ref={panelRef}
+      >
         <p>No note selected.</p>
       </aside>
     );
@@ -381,6 +408,9 @@ export const MetadataPanel = component$(() => {
       <aside
         class={{ "metadata-panel": true, collapsed: !session.ui.showMetadata }}
         aria-hidden={session.ui.showMetadata ? "false" : "true"}
+        id="metadata-drawer"
+        tabIndex={-1}
+        ref={panelRef}
       >
         <header>
           <h2>Info</h2>
@@ -512,6 +542,9 @@ export const MetadataPanel = component$(() => {
     <aside
       class={{ "metadata-panel": true, collapsed: !session.ui.showMetadata }}
       aria-hidden={session.ui.showMetadata ? "false" : "true"}
+      id="metadata-drawer"
+      tabIndex={-1}
+      ref={panelRef}
     >
       <header>
         <h2>Info</h2>

@@ -1,4 +1,4 @@
-import { component$, useSignal, useTask$ } from "@builder.io/qwik";
+import { component$, useSignal, useTask$, useVisibleTask$ } from "@builder.io/qwik";
 import { stampNoteUpdated } from "../lib/diaryx/note-utils";
 import { CodeMirrorEditor } from "./codemirror-editor";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
@@ -10,6 +10,10 @@ export const NoteEditor = component$(() => {
   const markdownSignal = useSignal("");
   const htmlSignal = useSignal("");
   const viewMode = useSignal(session.ui.editorMode);
+  const libraryToggleRef = useSignal<HTMLButtonElement>();
+  const metadataToggleRef = useSignal<HTMLButtonElement>();
+  const libraryWasOpen = useSignal(session.ui.showLibrary);
+  const metadataWasOpen = useSignal(session.ui.showMetadata);
 
   useTask$(({ track }) => {
     track(() => session.ui.libraryMode);
@@ -43,6 +47,30 @@ export const NoteEditor = component$(() => {
     if (viewMode.value !== mode) {
       viewMode.value = mode;
     }
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track }) => {
+    track(() => session.ui.showLibrary);
+    const wasOpen = libraryWasOpen.value;
+    const isOpen = session.ui.showLibrary;
+    libraryWasOpen.value = isOpen;
+    if (!wasOpen || isOpen) return;
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(max-width: 900px)").matches) return;
+    libraryToggleRef.value?.focus();
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track }) => {
+    track(() => session.ui.showMetadata);
+    const wasOpen = metadataWasOpen.value;
+    const isOpen = session.ui.showMetadata;
+    metadataWasOpen.value = isOpen;
+    if (!wasOpen || isOpen) return;
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(max-width: 900px)").matches) return;
+    metadataToggleRef.value?.focus();
   });
 
   const libraryMode = session.ui.libraryMode;
@@ -106,6 +134,44 @@ export const NoteEditor = component$(() => {
               </select>
             </label>
           )}
+          <div class="mobile-drawer-toggles">
+            <button
+              type="button"
+              class="mobile-drawer-toggle left"
+              aria-label="Open notes"
+              aria-controls="library-drawer"
+              aria-expanded={session.ui.showLibrary ? "true" : "false"}
+              ref={libraryToggleRef}
+              onClick$={() => {
+                if (session.ui.showLibrary) {
+                  session.ui.showLibrary = false;
+                  return;
+                }
+                session.ui.showLibrary = true;
+                session.ui.showMetadata = false;
+              }}
+            >
+              Notes
+            </button>
+            <button
+              type="button"
+              class="mobile-drawer-toggle right"
+              aria-label="Open info"
+              aria-controls="metadata-drawer"
+              aria-expanded={session.ui.showMetadata ? "true" : "false"}
+              ref={metadataToggleRef}
+              onClick$={() => {
+                if (session.ui.showMetadata) {
+                  session.ui.showMetadata = false;
+                  return;
+                }
+                session.ui.showMetadata = true;
+                session.ui.showLibrary = false;
+              }}
+            >
+              Info
+            </button>
+          </div>
         </div>
       </header>
       <div class="editor-panes">

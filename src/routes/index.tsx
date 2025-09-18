@@ -42,6 +42,7 @@ export default component$(() => {
   const notesHydrated = useSignal(false);
   const currentUserId = useSignal<string | null>(null);
   const isSyncing = useSignal(false);
+  const isMobile = useSignal(false);
 
   const clampWidths = $(
     () => {
@@ -184,6 +185,23 @@ export default component$(() => {
       session.ui.rightPanelWidth = 0;
     }
     clampWidths();
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ cleanup }) => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 900px)");
+    const update = () => {
+      isMobile.value = media.matches;
+    };
+    update();
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", update);
+      cleanup(() => media.removeEventListener("change", update));
+    } else {
+      media.addListener(update);
+      cleanup(() => media.removeListener(update));
+    }
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task
@@ -342,16 +360,48 @@ export default component$(() => {
     return () => window.removeEventListener("resize", adjust);
   });
 
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track, cleanup }) => {
+    track(() => isMobile.value);
+    track(() => session.ui.showLibrary);
+    track(() => session.ui.showMetadata);
+    if (typeof document === "undefined") return;
+    const mobileActive = isMobile.value;
+    const drawerOpen = session.ui.showLibrary || session.ui.showMetadata;
+    if (!mobileActive || !drawerOpen) {
+      document.body.removeAttribute("data-drawer-open");
+      document.body.style.removeProperty("overflow");
+      return;
+    }
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        session.ui.showLibrary = false;
+        session.ui.showMetadata = false;
+      }
+    };
+
+    document.body.setAttribute("data-drawer-open", "true");
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeydown);
+
+    cleanup(() => {
+      document.removeEventListener("keydown", handleKeydown);
+      document.body.style.overflow = previousOverflow;
+      document.body.removeAttribute("data-drawer-open");
+    });
+  });
+
   const leftWidth = Math.max(session.ui.leftPanelWidth, 0);
   const rightWidth = Math.max(session.ui.rightPanelWidth, 0);
   const gridTemplate = `${leftWidth}px ${HANDLE_WIDTH}px minmax(${MIN_EDITOR_WIDTH}px, 1fr) ${HANDLE_WIDTH}px ${rightWidth}px`;
 
+  const drawerOpen = session.ui.showLibrary || session.ui.showMetadata;
+  const shellStyle = isMobile.value ? undefined : { gridTemplateColumns: gridTemplate };
+
   return (
-    <div
-      class="app-shell"
-      ref={shellRef}
-      style={{ gridTemplateColumns: gridTemplate }}
-    >
+    <div class="app-shell" ref={shellRef} style={shellStyle}>
       <NoteList />
       <button
         type="button"
@@ -371,6 +421,16 @@ export default component$(() => {
         onPointerDown$={beginRightDrag}
       />
       <MetadataPanel />
+      {isMobile.value && drawerOpen && (
+        <div
+          class="drawer-backdrop"
+          data-open="true"
+          onClick$={() => {
+            session.ui.showLibrary = false;
+            session.ui.showMetadata = false;
+          }}
+        />
+      )}
     </div>
   );
 });
