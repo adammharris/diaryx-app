@@ -47,41 +47,7 @@ export const CodeMirrorEditor = component$(
           return;
         }
 
-        // Wait for container to have measurable size before initializing CodeMirror
-        const waitForSize = (): Promise<void> =>
-          new Promise((resolve) => {
-            const rect = parent.getBoundingClientRect?.();
-            if (rect && rect.width > 4 && rect.height > 4) {
-              resolve();
-              return;
-            }
-            if (typeof ResizeObserver !== "undefined") {
-              const ro = new ResizeObserver((entries) => {
-                const cr =
-                  entries[0]?.contentRect ??
-                  (entries[0]?.target as any)?.getBoundingClientRect?.();
-                if (cr && cr.width > 4 && cr.height > 4) {
-                  ro.disconnect();
-                  resolve();
-                }
-              });
-              ro.observe(parent);
-            } else {
-              let tries = 0;
-              const tick = () => {
-                const r = parent.getBoundingClientRect?.();
-                if (r && r.width > 4 && r.height > 4) {
-                  resolve();
-                  return;
-                }
-                if (tries++ < 60) requestAnimationFrame(tick);
-                else resolve();
-              };
-              requestAnimationFrame(tick);
-            }
-          });
-
-        await waitForSize();
+        // Initialize CodeMirror immediately; ResizeObserver will trigger measurement as needed.
 
         const [
           stateModule,
@@ -301,11 +267,16 @@ export const CodeMirrorEditor = component$(
         ref={containerRef}
         style={{ fontFamily: CODE_FONT_STACK }}
       >
-        {!editorReady.value && (
-          <pre class="codemirror-fallback" aria-hidden="true">
-            {value}
-          </pre>
-        )}
+        <pre
+          class={{
+            "codemirror-fallback": true,
+            "codemirror-fallback--hidden": editorReady.value,
+          }}
+          aria-hidden="true"
+          hidden={editorReady.value}
+        >
+          {value}
+        </pre>
       </div>
     );
   },

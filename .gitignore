@@ -30,6 +30,7 @@ lerna-debug.log*
 !.vscode/*.code-snippets
 
 Diaryx Writing Specification.md
+test-results
 
 .idea
 .DS_Store
