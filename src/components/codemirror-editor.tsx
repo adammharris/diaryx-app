@@ -365,6 +365,12 @@ const livePreviewTheme = (EditorView: any) =>
       ".cm-formatting": {
         color: "transparent",
         textDecoration: "none",
+        display: "inline-block",
+        width: "0",
+        overflow: "hidden",
+      },
+      ".cm-formatting::selection": {
+        color: "#000",
       },
     },
     { dark: false },
