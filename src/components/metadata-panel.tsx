@@ -561,6 +561,9 @@ export const MetadataPanel = component$(() => {
     ([key]) => !KNOWN_METADATA_KEYS.has(key),
   );
   const autoUpdate = isAutoUpdateEnabled(note);
+  const closeDrawer = $(() => {
+    session.ui.showMetadata = false;
+  });
 
   return (
     <aside
@@ -570,6 +573,16 @@ export const MetadataPanel = component$(() => {
       tabIndex={-1}
       ref={panelRef}
     >
+      <div class="drawer-close-bar">
+        <button
+          type="button"
+          class="drawer-close"
+          aria-label="Close info panel"
+          onClick$={closeDrawer}
+        >
+          <span class="sr-only">Close info panel</span>
+        </button>
+      </div>
       <header>
         <h2>Info</h2>
         <div class="tabs">
