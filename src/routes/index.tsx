@@ -225,32 +225,37 @@ export default component$(() => {
     }
   });
 
-  useTask$(() => {
-    if (typeof window === "undefined") return;
-    const storedTheme = window.localStorage.getItem(
-      "diaryx.theme",
-    ) as ThemePreference | null;
-    if (
-      storedTheme === "light" ||
-      storedTheme === "dark" ||
-      storedTheme === "system"
-    ) {
-      session.ui.theme = storedTheme;
-    }
-    const storedAccent = window.localStorage.getItem("diaryx.accent");
-    if (isValidAccent(storedAccent)) {
-      session.ui.accent = storedAccent;
-    }
-    const storedEditorMode = window.localStorage.getItem("diaryx.editorMode");
-    if (
-      storedEditorMode === "split" ||
-      storedEditorMode === "source" ||
-      storedEditorMode === "preview" ||
-      storedEditorMode === "live"
-    ) {
-      session.ui.editorMode = storedEditorMode as typeof session.ui.editorMode;
-    }
-  });
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(
+    () => {
+      if (typeof window === "undefined") return;
+      const storedTheme = window.localStorage.getItem(
+        "diaryx.theme",
+      ) as ThemePreference | null;
+      if (
+        storedTheme === "light" ||
+        storedTheme === "dark" ||
+        storedTheme === "system"
+      ) {
+        session.ui.theme = storedTheme;
+      }
+      const storedAccent = window.localStorage.getItem("diaryx.accent");
+      if (isValidAccent(storedAccent)) {
+        session.ui.accent = storedAccent;
+      }
+      const storedEditorMode = window.localStorage.getItem("diaryx.editorMode");
+      if (
+        storedEditorMode === "split" ||
+        storedEditorMode === "source" ||
+        storedEditorMode === "preview" ||
+        storedEditorMode === "live"
+      ) {
+        session.ui.editorMode =
+          storedEditorMode as typeof session.ui.editorMode;
+      }
+    },
+    { strategy: "document-ready" },
+  );
 
   useTask$(({ track }) => {
     track(() => session.ui.theme);

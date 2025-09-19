@@ -55,19 +55,37 @@ export const CodeMirrorEditor = component$(
           languageModule,
           commandsModule,
           viewModule,
+          highlightModule,
         ] = await Promise.all([
           import("@codemirror/state"),
           import("@codemirror/lang-markdown"),
           import("@codemirror/language"),
           import("@codemirror/commands"),
           import("@codemirror/view"),
+          import("@lezer/highlight"),
         ]);
 
         const { EditorState, Compartment } = stateModule;
         const { markdown, markdownLanguage, markdownKeymap } = markdownModule;
-        const { syntaxHighlighting, defaultHighlightStyle } = languageModule;
+        const {
+          syntaxHighlighting,
+          defaultHighlightStyle,
+          HighlightStyle,
+        } = languageModule;
         const { history, defaultKeymap, historyKeymap } = commandsModule;
         const { EditorView, keymap } = viewModule;
+        const { tags } = highlightModule;
+
+        const classHighlight = HighlightStyle.define([
+          { tag: tags.heading1, class: "cm-header cm-header-1" },
+          { tag: tags.heading2, class: "cm-header cm-header-2" },
+          { tag: tags.heading3, class: "cm-header cm-header-3" },
+          { tag: tags.heading, class: "cm-header" },
+          { tag: tags.monospace, class: "cm-inline-code" },
+          { tag: tags.strong, class: "cm-strong" },
+          { tag: tags.emphasis, class: "cm-em" },
+          { tag: tags.quote, class: "cm-quote" },
+        ]);
 
         const themeCompartment = new Compartment();
         const readOnlyCompartment = new Compartment();
@@ -85,6 +103,7 @@ export const CodeMirrorEditor = component$(
           markdown({ base: markdownLanguage }),
           EditorView.lineWrapping,
           EditorState.allowMultipleSelections.of(true),
+          syntaxHighlighting(classHighlight),
           syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
           readOnlyCompartment.of(EditorState.readOnly.of(!!readOnly)),
           themeCompartment.of(defaultTheme(EditorView)),
