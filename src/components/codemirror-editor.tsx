@@ -82,6 +82,7 @@ export const CodeMirrorEditor = component$(
           { tag: tags.strong, class: "cm-strong" },
           { tag: tags.emphasis, class: "cm-em" },
           { tag: tags.quote, class: "cm-quote" },
+          { tag: tags.processingInstruction, class: "cm-formatting" },
         ]);
 
         const themeCompartment = new Compartment();
