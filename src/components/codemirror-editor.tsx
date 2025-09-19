@@ -111,6 +111,7 @@ export const CodeMirrorEditor = component$(
               onChange$(update.state.doc.toString());
             }
           }),
+          // Formatting reveal is managed by a debounced selectionchange handler.
         ];
 
         const state = EditorState.create({
@@ -121,6 +122,81 @@ export const CodeMirrorEditor = component$(
         const view = new EditorView({ state, parent });
         editorViewSignal.value = view;
         editorReady.value = true;
+
+        // Listen to DOM selection changes to reveal/hide formatting tokens
+        const docForSel = (view.dom.ownerDocument || document) as Document;
+        let __revealRaf = 0;
+        const onSelectionChange = () => {
+          try {
+            if (__revealRaf) cancelAnimationFrame(__revealRaf);
+            __revealRaf = requestAnimationFrame(() => {
+              __revealRaf = 0;
+              const container = view.dom as HTMLElement;
+
+              // Gather non-empty CM selection ranges
+              const ranges = view.state.selection.ranges.filter(
+                (r: any) => !r.empty,
+              );
+              if (ranges.length === 0) {
+                const revealed = container.querySelectorAll(
+                  ".cm-formatting.cm-formatting--reveal",
+                );
+                for (let i = 0; i < revealed.length; i++) {
+                  (revealed[i] as HTMLElement).classList.remove(
+                    "cm-formatting--reveal",
+                  );
+                }
+                return;
+              }
+
+              // Compute vertical spans for each selection range using CM coordinates
+              const ySpans: Array<{ top: number; bottom: number }> = [];
+              for (const r of ranges) {
+                const a = view.coordsAtPos(r.from);
+                const b = view.coordsAtPos(r.to);
+                if (!a || !b) continue;
+                ySpans.push({
+                  top: Math.min(a.top, b.top),
+                  bottom: Math.max(a.bottom, b.bottom),
+                });
+              }
+              if (ySpans.length === 0) {
+                const revealed = container.querySelectorAll(
+                  ".cm-formatting.cm-formatting--reveal",
+                );
+                for (let i = 0; i < revealed.length; i++) {
+                  (revealed[i] as HTMLElement).classList.remove(
+                    "cm-formatting--reveal",
+                  );
+                }
+                return;
+              }
+
+              // Reveal all formatting tokens within any line intersecting selection spans
+              const lines = container.querySelectorAll(".cm-line");
+              for (let i = 0; i < lines.length; i++) {
+                const lineEl = lines[i] as HTMLElement;
+                const rect = lineEl.getBoundingClientRect();
+                const intersects = ySpans.some(
+                  (ys) => rect.bottom > ys.top && rect.top < ys.bottom,
+                );
+                const tokens = lineEl.querySelectorAll(".cm-formatting");
+                for (let j = 0; j < tokens.length; j++) {
+                  (tokens[j] as HTMLElement).classList.toggle(
+                    "cm-formatting--reveal",
+                    intersects,
+                  );
+                }
+              }
+            });
+          } catch {
+            // ignore
+          }
+        };
+        (view as any).__onSelectionChange = onSelectionChange;
+        (view as any).__revealRaf = () =>
+          __revealRaf && cancelAnimationFrame(__revealRaf);
+        docForSel.addEventListener("selectionchange", onSelectionChange);
 
         requestAnimationFrame(() => {
           try {
@@ -189,6 +265,26 @@ export const CodeMirrorEditor = component$(
           readOnlyCompartmentSignal.value = undefined;
           editableCompartmentSignal.value = undefined;
           editorViewCtorSignal.value = undefined;
+          // Remove selectionchange listener for cleanup
+          try {
+            const docForSel = (view.dom.ownerDocument || document) as Document;
+            const handler = (view as any).__onSelectionChange as
+              | EventListener
+              | undefined;
+            if (handler) {
+              docForSel.removeEventListener("selectionchange", handler);
+              (view as any).__onSelectionChange = undefined;
+            }
+            const cancelRaf = (view as any).__revealRaf as
+              | (() => void)
+              | undefined;
+            if (cancelRaf) {
+              cancelRaf();
+              (view as any).__revealRaf = undefined;
+            }
+          } catch {
+            void 0;
+          }
           view.destroy();
           if (onDispose$) await onDispose$();
         });
@@ -344,6 +440,12 @@ const livePreviewTheme = (EditorView: any) =>
       ".cm-line": {
         padding: "0.1rem 0",
       },
+      ".cm-header, .cm-header-1, .cm-header-2, .cm-header-3": {
+        display: "inline",
+        margin: "0",
+        padding: "0",
+        lineHeight: "1.25",
+      },
       ".cm-strong": {
         fontWeight: "700",
       },
@@ -365,12 +467,17 @@ const livePreviewTheme = (EditorView: any) =>
       ".cm-formatting": {
         color: "transparent",
         textDecoration: "none",
-        display: "inline-block",
-        width: "0",
-        overflow: "hidden",
+        fontSize: "0",
+        letterSpacing: "0",
+      },
+      ".cm-formatting--reveal": {
+        color: "inherit",
+        textDecoration: "inherit",
+        fontSize: "inherit",
+        letterSpacing: "inherit",
       },
       ".cm-formatting::selection": {
-        color: "#000",
+        color: "inherit",
       },
     },
     { dark: false },
