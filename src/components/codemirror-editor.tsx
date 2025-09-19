@@ -67,11 +67,8 @@ export const CodeMirrorEditor = component$(
 
         const { EditorState, Compartment } = stateModule;
         const { markdown, markdownLanguage, markdownKeymap } = markdownModule;
-        const {
-          syntaxHighlighting,
-          defaultHighlightStyle,
-          HighlightStyle,
-        } = languageModule;
+        const { syntaxHighlighting, defaultHighlightStyle, HighlightStyle } =
+          languageModule;
         const { history, defaultKeymap, historyKeymap } = commandsModule;
         const { EditorView, keymap } = viewModule;
         const { tags } = highlightModule;
@@ -365,7 +362,8 @@ const livePreviewTheme = (EditorView: any) =>
         color: "var(--text-secondary)",
       },
       ".cm-formatting": {
-        opacity: "0.35",
+        color: "transparent",
+        textDecoration: "none",
       },
     },
     { dark: false },

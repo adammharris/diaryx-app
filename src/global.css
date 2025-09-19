@@ -1894,10 +1894,10 @@ input[type="radio"] {
     z-index: 40;
   }
 
-.drawer-backdrop[data-open="true"] {
-  opacity: 1;
-  pointer-events: auto;
-}
+  .drawer-backdrop[data-open="true"] {
+    opacity: 1;
+    pointer-events: auto;
+  }
 
   .note-list,
   .metadata-panel {
@@ -2045,6 +2045,20 @@ input[type="radio"] {
 
 .editor-pane.live .cm-scroller {
   background: transparent;
+}
+
+/* Live preview: hide markdown formatting tokens by default */
+.note-editor[data-mode="live"] .cm-formatting {
+  color: transparent;
+  opacity: 1;
+  text-decoration: none;
+}
+
+/* Make formatting tokens visible when selected */
+.note-editor[data-mode="live"] .cm-formatting::selection,
+.note-editor[data-mode="live"] .cm-formatting *::selection {
+  color: var(--text-primary);
+  -webkit-text-fill-color: var(--text-primary);
 }
 .note-list .accent-chip:focus-visible {
   outline: none;
