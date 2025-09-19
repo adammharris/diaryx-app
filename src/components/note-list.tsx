@@ -28,10 +28,6 @@ export const NoteList = component$(() => {
   const displaySectionOpen = useSignal(false);
   const noteListRef = useSignal<HTMLElement>();
 
-  const closeDrawer = $(() => {
-    session.ui.showLibrary = false;
-  });
-
   const themeOptions: ReadonlyArray<{
     value: ThemePreference;
     label: string;
@@ -313,16 +309,6 @@ export const NoteList = component$(() => {
       tabIndex={-1}
       ref={noteListRef}
     >
-      <div class="drawer-close-bar">
-        <button
-          type="button"
-          class="drawer-close"
-          aria-label="Close notes panel"
-          onClick$={closeDrawer}
-        >
-          <span class="sr-only">Close notes panel</span>
-        </button>
-      </div>
       <header>
         <div class="actions">
           <button type="button" onClick$={handleCreateNote}>

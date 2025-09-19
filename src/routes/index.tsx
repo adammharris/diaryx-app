@@ -4,6 +4,7 @@ import {
   useSignal,
   useTask$,
   useVisibleTask$,
+  useOnDocument,
 } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
 import { MetadataPanel } from "../components/metadata-panel";
@@ -48,6 +49,8 @@ const HANDLE_WIDTH = 16;
 const MIN_EDITOR_WIDTH = 420;
 const MIN_PANEL_WIDTH = 180;
 const SNAP_THRESHOLD = 32;
+const DEFAULT_LEFT_PANEL_WIDTH = 260;
+const DEFAULT_RIGHT_PANEL_WIDTH = 300;
 
 export default component$(() => {
   const session = useDiaryxSessionProvider();
@@ -56,6 +59,12 @@ export default component$(() => {
   const currentUserId = useSignal<string | null>(null);
   const isSyncing = useSignal(false);
   const isMobile = useSignal(false);
+  const lastDesktopLeftWidth = useSignal(
+    session.ui.leftPanelWidth || DEFAULT_LEFT_PANEL_WIDTH,
+  );
+  const lastDesktopRightWidth = useSignal(
+    session.ui.rightPanelWidth || DEFAULT_RIGHT_PANEL_WIDTH,
+  );
 
   const clampWidths = $(() => {
     const shell = shellRef.value;
@@ -200,11 +209,30 @@ export default component$(() => {
   });
 
   useTask$(() => {
-    if (globalThis.window && window.innerWidth < 900) {
-      session.ui.showLibrary = false;
-      session.ui.leftPanelWidth = 0;
-      session.ui.showMetadata = false;
-      session.ui.rightPanelWidth = 0;
+    if (typeof window !== "undefined") {
+      if (window.innerWidth < 900) {
+        if (session.ui.leftPanelWidth > 0) {
+          lastDesktopLeftWidth.value = session.ui.leftPanelWidth;
+        }
+        if (session.ui.rightPanelWidth > 0) {
+          lastDesktopRightWidth.value = session.ui.rightPanelWidth;
+        }
+        session.ui.leftPanelWidth = 0;
+        session.ui.rightPanelWidth = 0;
+        session.ui.showLibrary = false;
+        session.ui.showMetadata = false;
+      } else {
+        if (session.ui.leftPanelWidth <= 0) {
+          session.ui.leftPanelWidth =
+            lastDesktopLeftWidth.value || DEFAULT_LEFT_PANEL_WIDTH;
+        }
+        if (session.ui.rightPanelWidth <= 0) {
+          session.ui.rightPanelWidth =
+            lastDesktopRightWidth.value || DEFAULT_RIGHT_PANEL_WIDTH;
+        }
+        session.ui.showLibrary = true;
+        session.ui.showMetadata = true;
+      }
     }
     clampWidths();
   });
@@ -291,6 +319,69 @@ export default component$(() => {
     if (typeof window === "undefined") return;
     if (session.ui.libraryMode !== "shared") {
       window.localStorage.setItem("diaryx.editorMode", session.ui.editorMode);
+    }
+  });
+
+  useTask$(({ track }) => {
+    const mobile = track(() => isMobile.value);
+    if (typeof window === "undefined") return;
+    if (mobile) {
+      if (session.ui.leftPanelWidth > 0) {
+        lastDesktopLeftWidth.value = session.ui.leftPanelWidth;
+      }
+      if (session.ui.rightPanelWidth > 0) {
+        lastDesktopRightWidth.value = session.ui.rightPanelWidth;
+      }
+      session.ui.leftPanelWidth = 0;
+      session.ui.rightPanelWidth = 0;
+      session.ui.showLibrary = false;
+      session.ui.showMetadata = false;
+    } else {
+      const leftWidth = lastDesktopLeftWidth.value || DEFAULT_LEFT_PANEL_WIDTH;
+      const rightWidth =
+        lastDesktopRightWidth.value || DEFAULT_RIGHT_PANEL_WIDTH;
+      session.ui.leftPanelWidth = leftWidth;
+      session.ui.rightPanelWidth = rightWidth;
+      session.ui.showLibrary = leftWidth > SNAP_THRESHOLD;
+      session.ui.showMetadata = rightWidth > SNAP_THRESHOLD;
+    }
+  });
+
+  useTask$(({ track }) => {
+    const mobile = track(() => isMobile.value);
+    const libraryOpen = track(() => session.ui.showLibrary);
+    if (typeof window === "undefined") return;
+    if (!mobile) return;
+    if (libraryOpen) {
+      session.ui.showMetadata = false;
+    }
+  });
+
+  useTask$(({ track }) => {
+    const mobile = track(() => isMobile.value);
+    const metadataOpen = track(() => session.ui.showMetadata);
+    if (typeof window === "undefined") return;
+    if (!mobile) return;
+    if (metadataOpen) {
+      session.ui.showLibrary = false;
+    }
+  });
+
+  useTask$(({ track }) => {
+    const mobile = track(() => isMobile.value);
+    const leftWidth = track(() => session.ui.leftPanelWidth);
+    if (typeof window === "undefined") return;
+    if (!mobile && leftWidth > 0) {
+      lastDesktopLeftWidth.value = leftWidth;
+    }
+  });
+
+  useTask$(({ track }) => {
+    const mobile = track(() => isMobile.value);
+    const rightWidth = track(() => session.ui.rightPanelWidth);
+    if (typeof window === "undefined") return;
+    if (!mobile && rightWidth > 0) {
+      lastDesktopRightWidth.value = rightWidth;
     }
   });
 
@@ -428,13 +519,67 @@ export default component$(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", handleKeydown);
+    // Click-away handled via useOnDocument('click')
 
     cleanup(() => {
       document.removeEventListener("keydown", handleKeydown);
+      // Click-away handled via useOnDocument('click')
       document.body.style.overflow = previousOverflow;
       document.body.removeAttribute("data-drawer-open");
     });
   });
+
+  // Global click-away for mobile drawers using Qwik's document listener
+  useOnDocument(
+    "click",
+    $((event) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      // Only handle on mobile viewport and when a drawer is open
+      if (
+        typeof window !== "undefined" &&
+        !window.matchMedia("(max-width: 900px)").matches
+      )
+        return;
+      if (!(session.ui.showLibrary || session.ui.showMetadata)) return;
+
+      const insideLibrary = !!target.closest("#library-drawer");
+      const insideMetadata = !!target.closest("#metadata-drawer");
+      const onToggle =
+        !!target.closest('[aria-controls="library-drawer"]') ||
+        !!target.closest('[aria-controls="metadata-drawer"]');
+
+      if (insideLibrary || insideMetadata || onToggle) return;
+
+      session.ui.showLibrary = false;
+      session.ui.showMetadata = false;
+    }),
+  );
+  useOnDocument(
+    "pointerdown",
+    $((event) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      // Only handle on mobile viewport and when a drawer is open
+      if (
+        typeof window !== "undefined" &&
+        !window.matchMedia("(max-width: 900px)").matches
+      )
+        return;
+      if (!(session.ui.showLibrary || session.ui.showMetadata)) return;
+
+      const insideLibrary = !!target.closest("#library-drawer");
+      const insideMetadata = !!target.closest("#metadata-drawer");
+      const onToggle =
+        !!target.closest('[aria-controls="library-drawer"]') ||
+        !!target.closest('[aria-controls="metadata-drawer"]');
+
+      if (insideLibrary || insideMetadata || onToggle) return;
+
+      session.ui.showLibrary = false;
+      session.ui.showMetadata = false;
+    }),
+  );
 
   const leftWidth = Math.max(session.ui.leftPanelWidth, 0);
   const rightWidth = Math.max(session.ui.rightPanelWidth, 0);
@@ -446,7 +591,25 @@ export default component$(() => {
     : { gridTemplateColumns: gridTemplate };
 
   return (
-    <div class="app-shell" ref={shellRef} style={shellStyle}>
+    <div
+      class="app-shell"
+      ref={shellRef}
+      style={shellStyle}
+      onClick$={$((event) => {
+        const target = event.target as HTMLElement | null;
+        if (!target) return;
+        if (!isMobile.value) return;
+        if (!(session.ui.showLibrary || session.ui.showMetadata)) return;
+        const insideLibrary = !!target.closest("#library-drawer");
+        const insideMetadata = !!target.closest("#metadata-drawer");
+        const onToggle =
+          !!target.closest('[aria-controls="library-drawer"]') ||
+          !!target.closest('[aria-controls="metadata-drawer"]');
+        if (insideLibrary || insideMetadata || onToggle) return;
+        session.ui.showLibrary = false;
+        session.ui.showMetadata = false;
+      })}
+    >
       <NoteList />
       <button
         type="button"
@@ -472,16 +635,14 @@ export default component$(() => {
         onPointerDown$={beginRightDrag}
       />
       <MetadataPanel />
-      {isMobile.value && drawerOpen && (
-        <div
-          class="drawer-backdrop"
-          data-open="true"
-          onClick$={() => {
-            session.ui.showLibrary = false;
-            session.ui.showMetadata = false;
-          }}
-        />
-      )}
+      <div
+        class="drawer-backdrop"
+        data-open={isMobile.value && drawerOpen ? "true" : undefined}
+        onClick$={() => {
+          session.ui.showLibrary = false;
+          session.ui.showMetadata = false;
+        }}
+      />
     </div>
   );
 });

@@ -7,26 +7,36 @@ test.describe('Mobile drawers', () => {
 
     const libraryDrawer = page.locator('#library-drawer');
     const metadataDrawer = page.locator('#metadata-drawer');
-    const libraryClose = libraryDrawer.locator('.drawer-close');
-    const metadataClose = metadataDrawer.locator('.drawer-close');
 
-    if ((await metadataDrawer.getAttribute('aria-hidden')) === 'false') {
-      await metadataClose.click();
-      await expect(metadataDrawer).toHaveAttribute('aria-hidden', 'true');
-    }
-    if ((await libraryDrawer.getAttribute('aria-hidden')) === 'false') {
-      await libraryClose.click();
-      await expect(libraryDrawer).toHaveAttribute('aria-hidden', 'true');
-    }
+    await expect(libraryDrawer).toHaveAttribute('aria-hidden', 'true');
+    await expect(metadataDrawer).toHaveAttribute('aria-hidden', 'true');
 
     await page.locator('.mobile-drawer-toggle.left').click();
     await expect(libraryDrawer).toHaveAttribute('aria-hidden', 'false');
-    await libraryClose.click();
+    await expect(metadataDrawer).toHaveAttribute('aria-hidden', 'true');
+
+    const backdrop = page.locator('.drawer-backdrop');
+    await backdrop.waitFor({ state: 'attached' });
+    await expect(backdrop).toHaveAttribute('data-open', 'true');
+    await backdrop.click();
     await expect(libraryDrawer).toHaveAttribute('aria-hidden', 'true');
 
     await page.locator('.mobile-drawer-toggle.right').click();
     await expect(metadataDrawer).toHaveAttribute('aria-hidden', 'false');
-    await metadataClose.click();
+    await expect(libraryDrawer).toHaveAttribute('aria-hidden', 'true');
+
+    await page.locator('.mobile-drawer-toggle.left').click();
+    await expect(libraryDrawer).toHaveAttribute('aria-hidden', 'false');
     await expect(metadataDrawer).toHaveAttribute('aria-hidden', 'true');
+
+    await backdrop.waitFor({ state: 'attached' });
+    await expect(backdrop).toHaveAttribute('data-open', 'true');
+    await backdrop.click();
+    await expect(libraryDrawer).toHaveAttribute('aria-hidden', 'true');
+    await expect(metadataDrawer).toHaveAttribute('aria-hidden', 'true');
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(libraryDrawer).toHaveAttribute('aria-hidden', 'false');
+    await expect(metadataDrawer).toHaveAttribute('aria-hidden', 'false');
   });
 });
