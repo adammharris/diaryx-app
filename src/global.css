@@ -114,7 +114,8 @@ body {
   min-width: 100vw;
   box-sizing: border-box;
   padding: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 input[type="checkbox"],
@@ -123,11 +124,12 @@ input[type="radio"] {
 }
 
 .app-shell {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  min-height: 100vh;
   display: grid;
-  grid-template-columns: 260px 16px minmax(0, 1fr) 16px 300px;
-  grid-auto-rows: minmax(0, 1fr);
+  /*grid-template-columns: 260px 16px minmax(0, 1fr) 16px 300px;*/
+  grid-template-columns: 1fr;
+  /*grid-auto-rows: minmax(0, 1fr);*/
   color: var(--text-primary);
   box-sizing: border-box;
   min-height: 0;
@@ -166,7 +168,7 @@ input[type="radio"] {
 .note-list header .actions {
   display: grid;
   gap: 0.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  /*grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));*/
   grid-auto-rows: 1fr;
   width: 100%;
 }
@@ -782,12 +784,12 @@ input[type="radio"] {
 .note-list .settings-dialog .close-button:hover {
   color: var(--text-primary);
 }
-
+/*
 .note-list.collapsed {
   visibility: hidden;
   pointer-events: none;
   opacity: 0;
-}
+}*/
 
 .panel-handle {
   background: var(--surface-base);
@@ -1096,12 +1098,12 @@ input[type="radio"] {
 .note-editor .editor-pane {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .note-editor textarea {
   width: 100%;
-  height: 100%;
+  /*height: 100%;*/
   border: none;
   resize: none;
   background: transparent;
@@ -1127,6 +1129,7 @@ input[type="radio"] {
   border-left: 1px solid var(--surface-border);
   background: var(--surface-elevated);
   line-height: 1.65;
+  overflow: auto;
 }
 
 .note-editor[data-mode="source"] .preview-pane,
@@ -1831,12 +1834,12 @@ input[type="radio"] {
   justify-content: center;
   color: var(--text-secondary);
 }
-
+/*
 .metadata-panel.collapsed {
   visibility: hidden;
   pointer-events: none;
   opacity: 0;
-}
+}*/
 
 @media (max-width: 900px) {
   :root {
@@ -1846,13 +1849,13 @@ input[type="radio"] {
 
   .app-shell {
     display: grid;
-    grid-template-columns: 1fr !important;
+    width: 100%;
+    grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
-    position: relative;
   }
 
   .panel-handle {
-    display: none !important;
+    display: none;
   }
 
   .note-editor {
@@ -1863,6 +1866,7 @@ input[type="radio"] {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+    padding: var(--frame-pad-y) var(--frame-pad-x) 1rem;
   }
 
   .note-editor .toolbar-groups {
@@ -1954,12 +1958,38 @@ input[type="radio"] {
   .note-editor .view-select select {
     width: 100%;
   }
+
+  .note-editor .editor-pane,
+  .note-editor .preview-pane {
+    padding: var(--frame-pad-y) var(--frame-pad-x);
+  }
+
+  .note-editor,
+  .note-editor .editor-toolbar,
+  .note-editor .editor-panes,
+  .note-editor .editor-pane,
+  .note-editor .preview-pane,
+  .prosemirror-container,
+  .prosemirror-container .ProseMirror-root,
+  .codemirror-container,
+  .cm-editor,
+  .cm-editor .cm-scroller {
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  .prosemirror-container .ProseMirror-root,
+  .prosemirror-container .ProseMirror-root.pm-live {
+    padding: var(--frame-pad-y) var(--frame-pad-x) 4rem !important;
+    max-width: 100% !important;
+  }
 }
 .codemirror-container {
   display: flex;
   flex: 1 1 auto;
   min-height: 160px;
-  height: auto;
+  /*height: auto;*/
 }
 
 .cm-editor {
