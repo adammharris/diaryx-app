@@ -1076,6 +1076,7 @@ input[type="radio"] {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-auto-rows: minmax(0, 1fr);
+  overflow: auto;
 }
 
 .note-editor[data-mode="live"] .editor-panes,
@@ -1860,6 +1861,8 @@ input[type="radio"] {
 
   .note-editor {
     grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    min-height: 0;
   }
 
   .note-editor .editor-toolbar {
@@ -1962,6 +1965,7 @@ input[type="radio"] {
   .note-editor .editor-pane,
   .note-editor .preview-pane {
     padding: var(--frame-pad-y) var(--frame-pad-x);
+    min-height: 0;
   }
 
   .note-editor,
@@ -1989,7 +1993,7 @@ input[type="radio"] {
   display: flex;
   flex: 1 1 auto;
   min-height: 160px;
-  /*height: auto;*/
+  height: auto;
 }
 
 .cm-editor {
@@ -2075,6 +2079,7 @@ input[type="radio"] {
 
 .editor-pane.live .cm-scroller {
   background: transparent;
+  height: auto;
 }
 
 /* Live preview: hide markdown formatting tokens by default*/
