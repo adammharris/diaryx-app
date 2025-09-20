@@ -74,7 +74,11 @@
     "micromark-extension-gfm": "^3.0.0",
     "micromark-extension-mdxjs": "^3.0.0",
     "micromark-util-combine-extensions": "^2.0.1",
-    "zod": "^4.1.8"
+    "zod": "^4.1.8",
+    "prosemirror-markdown": "*",
+    "prosemirror-state": "*",
+    "prosemirror-view": "*",
+    "prosemirror-example-setup": "*"
   },
   "vitest": {
     "environment": "jsdom",

@@ -2047,14 +2047,14 @@ input[type="radio"] {
   background: transparent;
 }
 
-/* Live preview: hide markdown formatting tokens by default */
+/* Live preview: hide markdown formatting tokens by default*/
 .note-editor[data-mode="live"] .cm-formatting {
   color: transparent;
   opacity: 1;
   text-decoration: none;
 }
 
-/* Make formatting tokens visible when selected */
+/* Make formatting tokens visible when selected*/
 .note-editor[data-mode="live"] .cm-formatting::selection,
 .note-editor[data-mode="live"] .cm-formatting *::selection {
   color: var(--text-primary);

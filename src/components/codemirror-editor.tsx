@@ -33,6 +33,8 @@ export const CodeMirrorEditor = component$(
     const themeCompartmentSignal = useSignal<any>();
     const readOnlyCompartmentSignal = useSignal<any>();
     const editableCompartmentSignal = useSignal<any>();
+    const formattingCompartmentSignal = useSignal<any>();
+    const formattingPluginBuilderSignal = useSignal<any>();
     const editorViewCtorSignal = useSignal<any>();
     const isApplyingExternalChange = useSignal(false);
 
@@ -71,6 +73,8 @@ export const CodeMirrorEditor = component$(
           languageModule;
         const { history, defaultKeymap, historyKeymap } = commandsModule;
         const { EditorView, keymap } = viewModule;
+        const Decoration = (viewModule as any).Decoration;
+        const ViewPlugin = (viewModule as any).ViewPlugin;
         const { tags } = highlightModule;
 
         const classHighlight = HighlightStyle.define([
@@ -88,13 +92,172 @@ export const CodeMirrorEditor = component$(
         const themeCompartment = new Compartment();
         const readOnlyCompartment = new Compartment();
         const editableCompartment = new Compartment();
+        const formattingCompartment = new Compartment();
 
         editorStateSignal.value = EditorState;
         editorViewCtorSignal.value = EditorView;
         themeCompartmentSignal.value = themeCompartment;
         readOnlyCompartmentSignal.value = readOnlyCompartment;
         editableCompartmentSignal.value = editableCompartment;
+        formattingCompartmentSignal.value = formattingCompartment;
 
+        // Decoration-based plugin: replace formatting tokens unless selection intersects them
+        const buildFormattingReplacePlugin = () => {
+          const build = (view: any) => {
+            const ranges: any[] = [];
+            const selRanges = view.state.selection.ranges;
+            const intersects = (from: number, to: number) =>
+              selRanges.some((r: any) => r.from < to && r.to > from);
+            const doc = view.state.doc;
+
+            for (let i = 1; i <= doc.lines; i++) {
+              const line = doc.line(i);
+              const text = line.text;
+              const from = line.from;
+
+              // Headings: #... + space(s) — replace marker and space(s) when not selected
+              let m = text.match(/^(#{1,6})([ \t]+)/);
+              if (m) {
+                const hlen = m[1].length;
+                const slen = m[2].length;
+                if (!intersects(from, from + hlen)) {
+                  ranges.push(Decoration.replace({}).range(from, from + hlen));
+                }
+                if (slen && !intersects(from + hlen, from + hlen + slen)) {
+                  ranges.push(
+                    Decoration.replace({}).range(
+                      from + hlen,
+                      from + hlen + slen,
+                    ),
+                  );
+                }
+              }
+
+              // Blockquote: > plus optional space — replace marker and space when not selected
+              m = text.match(/^>([ \t]?)/);
+              if (m) {
+                if (!intersects(from, from + 1)) {
+                  ranges.push(Decoration.replace({}).range(from, from + 1));
+                }
+                if (m[1] && !intersects(from + 1, from + 2)) {
+                  ranges.push(Decoration.replace({}).range(from + 1, from + 2));
+                }
+              }
+
+              // Lists: -, *, + or ordered markers with trailing spaces — replace marker and spaces when not selected
+              m = text.match(/^(\s*)([-*+]|[0-9]+[.)])([ \t]+)/);
+              if (m) {
+                const pre = m[1].length;
+                const mark = m[2].length;
+                const space = m[3].length;
+                if (!intersects(from + pre, from + pre + mark)) {
+                  ranges.push(
+                    Decoration.replace({}).range(from + pre, from + pre + mark),
+                  );
+                }
+                if (
+                  space &&
+                  !intersects(from + pre + mark, from + pre + mark + space)
+                ) {
+                  ranges.push(
+                    Decoration.replace({}).range(
+                      from + pre + mark,
+                      from + pre + mark + space,
+                    ),
+                  );
+                }
+              }
+              // (padding)
+              // (padding)
+
+              // Inline markers are not replaced; visibility handled via CSS (.cm-formatting)
+              // (padding)
+              // (padding)
+              // (padding)
+              // (padding)
+              // (padding)
+              // (padding)
+              // (padding)
+              // (padding)
+              // (padding)
+              // (padding)
+              // (padding)
+              // (padding)
+              // (padding)
+            }
+
+            return Decoration.set(ranges, true);
+          };
+
+          return ViewPlugin.fromClass(
+            class {
+              decorations: any;
+              constructor(view: any) {
+                this.decorations = build(view);
+              }
+              update(update: any) {
+                if (
+                  update.docChanged ||
+                  update.selectionSet ||
+                  update.viewportChanged
+                ) {
+                  this.decorations = build(update.view);
+                  try {
+                    const view = update.view;
+                    const container = view.dom as HTMLElement;
+                    const ranges = view.state.selection.ranges.filter(
+                      (r: any) => !r.empty,
+                    );
+                    if (ranges.length === 0) {
+                      const revealed = container.querySelectorAll(
+                        ".cm-formatting.cm-formatting--reveal",
+                      );
+                      for (let i = 0; i < revealed.length; i++) {
+                        (revealed[i] as HTMLElement).classList.remove(
+                          "cm-formatting--reveal",
+                        );
+                      }
+                    } else {
+                      const ySpans: Array<{ top: number; bottom: number }> = [];
+                      for (const r of ranges) {
+                        const a = view.coordsAtPos(r.from);
+                        const b = view.coordsAtPos(r.to);
+                        if (a && b)
+                          ySpans.push({
+                            top: Math.min(a.top, b.top),
+                            bottom: Math.max(a.bottom, b.bottom),
+                          });
+                      }
+                      const lines = container.querySelectorAll(".cm-line");
+                      for (let i = 0; i < lines.length; i++) {
+                        const lineEl = lines[i] as HTMLElement;
+                        const rect = lineEl.getBoundingClientRect();
+                        const inter = ySpans.some(
+                          (ys) => rect.bottom > ys.top && rect.top < ys.bottom,
+                        );
+                        const tokens =
+                          lineEl.querySelectorAll(".cm-formatting");
+                        for (let j = 0; j < tokens.length; j++) {
+                          (tokens[j] as HTMLElement).classList.toggle(
+                            "cm-formatting--reveal",
+                            inter,
+                          );
+                        }
+                      }
+                    }
+                  } catch {
+                    /* ignore */
+                  }
+                }
+              }
+              // (padding)
+              // (padding)
+            },
+            { decorations: (v: any) => v.decorations },
+          );
+        };
+
+        formattingPluginBuilderSignal.value = buildFormattingReplacePlugin;
         const baseExtensions = [
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap, ...markdownKeymap]),
@@ -106,12 +269,14 @@ export const CodeMirrorEditor = component$(
           readOnlyCompartment.of(EditorState.readOnly.of(!!readOnly)),
           themeCompartment.of(defaultTheme(EditorView)),
           editableCompartment.of(EditorView.editable.of(!readOnly)),
+          // Slot for formatting visibility plugin (configured per-variant)
+          formattingCompartment.of([]),
           EditorView.updateListener.of((update) => {
             if (update.docChanged && !isApplyingExternalChange.value) {
               onChange$(update.state.doc.toString());
             }
           }),
-          // Formatting reveal is managed by a debounced selectionchange handler.
+          // Formatting visibility handled by decoration plugin.
         ];
 
         const state = EditorState.create({
@@ -123,80 +288,7 @@ export const CodeMirrorEditor = component$(
         editorViewSignal.value = view;
         editorReady.value = true;
 
-        // Listen to DOM selection changes to reveal/hide formatting tokens
-        const docForSel = (view.dom.ownerDocument || document) as Document;
-        let __revealRaf = 0;
-        const onSelectionChange = () => {
-          try {
-            if (__revealRaf) cancelAnimationFrame(__revealRaf);
-            __revealRaf = requestAnimationFrame(() => {
-              __revealRaf = 0;
-              const container = view.dom as HTMLElement;
-
-              // Gather non-empty CM selection ranges
-              const ranges = view.state.selection.ranges.filter(
-                (r: any) => !r.empty,
-              );
-              if (ranges.length === 0) {
-                const revealed = container.querySelectorAll(
-                  ".cm-formatting.cm-formatting--reveal",
-                );
-                for (let i = 0; i < revealed.length; i++) {
-                  (revealed[i] as HTMLElement).classList.remove(
-                    "cm-formatting--reveal",
-                  );
-                }
-                return;
-              }
-
-              // Compute vertical spans for each selection range using CM coordinates
-              const ySpans: Array<{ top: number; bottom: number }> = [];
-              for (const r of ranges) {
-                const a = view.coordsAtPos(r.from);
-                const b = view.coordsAtPos(r.to);
-                if (!a || !b) continue;
-                ySpans.push({
-                  top: Math.min(a.top, b.top),
-                  bottom: Math.max(a.bottom, b.bottom),
-                });
-              }
-              if (ySpans.length === 0) {
-                const revealed = container.querySelectorAll(
-                  ".cm-formatting.cm-formatting--reveal",
-                );
-                for (let i = 0; i < revealed.length; i++) {
-                  (revealed[i] as HTMLElement).classList.remove(
-                    "cm-formatting--reveal",
-                  );
-                }
-                return;
-              }
-
-              // Reveal all formatting tokens within any line intersecting selection spans
-              const lines = container.querySelectorAll(".cm-line");
-              for (let i = 0; i < lines.length; i++) {
-                const lineEl = lines[i] as HTMLElement;
-                const rect = lineEl.getBoundingClientRect();
-                const intersects = ySpans.some(
-                  (ys) => rect.bottom > ys.top && rect.top < ys.bottom,
-                );
-                const tokens = lineEl.querySelectorAll(".cm-formatting");
-                for (let j = 0; j < tokens.length; j++) {
-                  (tokens[j] as HTMLElement).classList.toggle(
-                    "cm-formatting--reveal",
-                    intersects,
-                  );
-                }
-              }
-            });
-          } catch {
-            // ignore
-          }
-        };
-        (view as any).__onSelectionChange = onSelectionChange;
-        (view as any).__revealRaf = () =>
-          __revealRaf && cancelAnimationFrame(__revealRaf);
-        docForSel.addEventListener("selectionchange", onSelectionChange);
+        // Formatting visibility is handled by the decoration plugin (no DOM selection listeners needed)
 
         requestAnimationFrame(() => {
           try {
@@ -244,6 +336,7 @@ export const CodeMirrorEditor = component$(
           view.dispatch({
             effects: [
               themeCompartment.reconfigure(livePreviewTheme(EditorView)),
+              formattingCompartment.reconfigure(buildFormattingReplacePlugin()),
             ],
           });
         }
@@ -264,27 +357,9 @@ export const CodeMirrorEditor = component$(
           themeCompartmentSignal.value = undefined;
           readOnlyCompartmentSignal.value = undefined;
           editableCompartmentSignal.value = undefined;
+          formattingCompartmentSignal.value = undefined;
           editorViewCtorSignal.value = undefined;
-          // Remove selectionchange listener for cleanup
-          try {
-            const docForSel = (view.dom.ownerDocument || document) as Document;
-            const handler = (view as any).__onSelectionChange as
-              | EventListener
-              | undefined;
-            if (handler) {
-              docForSel.removeEventListener("selectionchange", handler);
-              (view as any).__onSelectionChange = undefined;
-            }
-            const cancelRaf = (view as any).__revealRaf as
-              | (() => void)
-              | undefined;
-            if (cancelRaf) {
-              cancelRaf();
-              (view as any).__revealRaf = undefined;
-            }
-          } catch {
-            void 0;
-          }
+          // No selectionchange listeners to clean up (plugin-based visibility)
           view.destroy();
           if (onDispose$) await onDispose$();
         });
@@ -328,13 +403,24 @@ export const CodeMirrorEditor = component$(
         }
         const view = editorViewSignal.value;
         const themeCompartment = themeCompartmentSignal.value;
+        const formattingCompartment = formattingCompartmentSignal.value;
+        const buildFmt = formattingPluginBuilderSignal.value as
+          | undefined
+          | (() => any);
         const EditorView = editorViewCtorSignal.value;
-        if (!view || !themeCompartment || !EditorView) return;
-        const theme =
-          currentVariant === "live"
-            ? livePreviewTheme(EditorView)
-            : defaultTheme(EditorView);
-        view.dispatch({ effects: [themeCompartment.reconfigure(theme)] });
+        if (!view || !themeCompartment || !EditorView || !formattingCompartment)
+          return;
+        const isLive = currentVariant === "live";
+        const theme = isLive
+          ? livePreviewTheme(EditorView)
+          : defaultTheme(EditorView);
+        const fmtExt = isLive && buildFmt ? buildFmt() : [];
+        view.dispatch({
+          effects: [
+            themeCompartment.reconfigure(theme),
+            formattingCompartment.reconfigure(fmtExt),
+          ],
+        });
       },
       { strategy: "document-ready" },
     );
@@ -444,7 +530,7 @@ const livePreviewTheme = (EditorView: any) =>
         display: "inline",
         margin: "0",
         padding: "0",
-        lineHeight: "1.25",
+        lineHeight: "inherit",
       },
       ".cm-strong": {
         fontWeight: "700",
@@ -469,15 +555,16 @@ const livePreviewTheme = (EditorView: any) =>
         textDecoration: "none",
         fontSize: "0",
         letterSpacing: "0",
+        whiteSpace: "inherit",
+        verticalAlign: "baseline",
       },
-      ".cm-formatting--reveal": {
+      ".cm-formatting.cm-formatting--reveal": {
         color: "inherit",
         textDecoration: "inherit",
         fontSize: "inherit",
         letterSpacing: "inherit",
-      },
-      ".cm-formatting::selection": {
-        color: "inherit",
+        whiteSpace: "inherit",
+        verticalAlign: "baseline",
       },
     },
     { dark: false },

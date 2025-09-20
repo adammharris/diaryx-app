@@ -6,6 +6,7 @@ import {
 } from "@builder.io/qwik";
 import { stampNoteUpdated } from "../lib/diaryx/note-utils";
 import { CodeMirrorEditor } from "./codemirror-editor";
+import { ProseMirrorEditor } from "./prosemirror-editor";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
 import { renderMarkdownToHtml } from "../lib/markdown/renderer";
 
@@ -201,18 +202,33 @@ export const NoteEditor = component$(() => {
       <div class="editor-panes">
         {showEditorPane && (
           <div class={{ "editor-pane": true, live: isLivePreview }}>
-            <CodeMirrorEditor
-              value={markdownSignal.value}
-              variant={isLivePreview ? "live" : "default"}
-              onChange$={(next: string) => {
-                if (note.body === next) {
-                  return;
-                }
-                markdownSignal.value = next;
-                note.body = next;
-                stampNoteUpdated(note);
-              }}
-            />
+            {isLivePreview ? (
+              <ProseMirrorEditor
+                value={markdownSignal.value}
+                variant="live"
+                onChange$={(next: string) => {
+                  if (note.body === next) {
+                    return;
+                  }
+                  markdownSignal.value = next;
+                  note.body = next;
+                  stampNoteUpdated(note);
+                }}
+              />
+            ) : (
+              <CodeMirrorEditor
+                value={markdownSignal.value}
+                variant="default"
+                onChange$={(next: string) => {
+                  if (note.body === next) {
+                    return;
+                  }
+                  markdownSignal.value = next;
+                  note.body = next;
+                  stampNoteUpdated(note);
+                }}
+              />
+            )}
           </div>
         )}
         {showPreviewPane && (
