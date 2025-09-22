@@ -45,13 +45,37 @@ const toVisibilityPayload = (visibility: Record<string, string[]> | undefined) =
 
 const readSyncResponse = async (response: Response) => {
   const status = response.status;
+  const contentType = response.headers.get("content-type") || "";
   let data: unknown = null;
-  try {
-    data = await response.json();
-  } catch (error) {
-    console.warn("Failed to parse sync response", error);
+  let textFallback: string | undefined;
+
+  if (contentType.includes("application/json")) {
+    try {
+      data = await response.json();
+      return { status, data, text: undefined };
+    } catch (error) {
+      console.warn("Failed to parse JSON sync response", error);
+    }
   }
-  return { status, data };
+
+  try {
+    textFallback = await response.text();
+    if (contentType.includes("application/json")) {
+      try {
+        data = JSON.parse(textFallback);
+      } catch (error) {
+        console.warn("Text response was not valid JSON", error);
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to read sync response text", error);
+  }
+
+  if (data == null && textFallback) {
+    data = textFallback;
+  }
+
+  return { status, data, text: textFallback };
 };
 
 export const syncNotesWithServer = async (session: DiaryxSessionState) => {
@@ -71,7 +95,7 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
     }),
   });
 
-  const { status, data } = await readSyncResponse(response);
+  const { status, data, text } = await readSyncResponse(response);
 
   if (status === 401) {
     throw new Error("You must be signed in to sync notes.");
@@ -81,6 +105,8 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
     const message =
       (data as any)?.error?.message ||
       (data as any)?.message ||
+      (typeof data === "string" ? data : undefined) ||
+      text ||
       response.statusText ||
       "Failed to sync notes.";
     throw new Error(message);

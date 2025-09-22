@@ -13,17 +13,12 @@ const respondBadRequest = (event: RequestEvent, message: string) => {
 };
 
 const parseUser = async (event: RequestEvent) => {
-  try {
-    const auth = getAuth(event);
-    const session = await auth.api.getSession({
-      headers: event.request.headers,
-      asResponse: false,
-    });
-    return session?.user ?? null;
-  } catch (error) {
-    console.warn("Failed to resolve session", error);
-    return null;
-  }
+  const auth = getAuth(event);
+  const session = await auth.api.getSession({
+    headers: event.request.headers,
+    asResponse: false,
+  });
+  return session?.user ?? null;
 };
 
 const toVisibilityArray = (value: unknown): string[] => {
@@ -62,51 +57,61 @@ const hasSharedAccess = (note: DiaryxNote, email: string): boolean => {
 };
 
 export const onGet: RequestHandler = async (event) => {
-  const user = await parseUser(event);
-  if (!user) {
-    respondUnauthorized(event);
-    return;
-  }
-
-  const userEmail = typeof user.email === "string" ? user.email.trim().toLowerCase() : "";
-  if (!userEmail) {
-    respondBadRequest(event, "EMAIL_REQUIRED");
-    return;
-  }
-
-  const rows = await listNotesSharedWithEmail(event, userEmail);
-  const notes: DiaryxNote[] = [];
-  const seen = new Set<string>();
-
-  for (const row of rows) {
-    try {
-      const { note } = parseDiaryxString(row.markdown, {
-        id: row.id,
-        sourceName: row.source_name ?? undefined,
-      });
-      const lastModified = Number(row.last_modified ?? Date.now());
-      note.lastModified = Number.isFinite(lastModified) ? lastModified : Date.now();
-      note.sourceName = row.source_name ?? undefined;
-      if (!hasSharedAccess(note, userEmail)) {
-        continue;
-      }
-      if (seen.has(note.id)) {
-        continue;
-      }
-      seen.add(note.id);
-      notes.push(note);
-    } catch (error) {
-      console.warn(`Failed to parse shared note ${row.id}`, error);
+  try {
+    const user = await parseUser(event);
+    if (!user) {
+      respondUnauthorized(event);
+      return;
     }
+
+    const userEmail = typeof user.email === "string" ? user.email.trim().toLowerCase() : "";
+    if (!userEmail) {
+      respondBadRequest(event, "EMAIL_REQUIRED");
+      return;
+    }
+
+    const rows = await listNotesSharedWithEmail(event, userEmail);
+    const notes: DiaryxNote[] = [];
+    const seen = new Set<string>();
+
+    for (const row of rows) {
+      try {
+        const { note } = parseDiaryxString(row.markdown, {
+          id: row.id,
+          sourceName: row.source_name ?? undefined,
+        });
+        const lastModified = Number(row.last_modified ?? Date.now());
+        note.lastModified = Number.isFinite(lastModified) ? lastModified : Date.now();
+        note.sourceName = row.source_name ?? undefined;
+        if (!hasSharedAccess(note, userEmail)) {
+          continue;
+        }
+        if (seen.has(note.id)) {
+          continue;
+        }
+        seen.add(note.id);
+        notes.push(note);
+      } catch (error) {
+        console.warn(`Failed to parse shared note ${row.id}`, error);
+      }
+    }
+
+    notes.sort((a, b) => {
+      const diff = (b.lastModified ?? 0) - (a.lastModified ?? 0);
+      if (diff !== 0) return diff;
+      return a.id.localeCompare(b.id);
+    });
+
+    event.json(200, { notes });
+  } catch (error) {
+    console.error("Failed to load shared notes", error);
+    event.json(500, {
+      error: {
+        message:
+          error instanceof Error ? error.message : "Unexpected error while loading shared notes.",
+      },
+    });
   }
-
-  notes.sort((a, b) => {
-    const diff = (b.lastModified ?? 0) - (a.lastModified ?? 0);
-    if (diff !== 0) return diff;
-    return a.id.localeCompare(b.id);
-  });
-
-  event.json(200, { notes });
 };
 
 export const config = {
