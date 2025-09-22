@@ -29,6 +29,7 @@ export const auth = pool
       emailAndPassword: {
         enabled: true,
       },
+      trustedOrigins:["https://app.diaryx.net", "https://*adammharris-projects.vercel.app"]
     })
   : createAuthStub();
 
