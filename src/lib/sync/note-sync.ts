@@ -5,6 +5,8 @@ import type { DiaryxSessionState } from "../state/diaryx-context";
 import { persistMarkdownNotes } from "../persistence/markdown-store";
 import { createDiaryxRepository } from "../persistence/diaryx-repository";
 import type { RemoteNotePayload, RemoteVisibilityTerm } from "./note-sync-types";
+import { apiFetch } from "../api/http";
+
 
 const buildPayload = (note: DiaryxNote) => ({
   id: note.id,
@@ -85,7 +87,7 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
   const localMarkdownById = new Map(payload.map((entry) => [entry.id, entry.markdown]));
   const visibilityTermsPayload = toVisibilityPayload(session.sharedVisibilityEmails);
 
-  const response = await fetch("/api/notes", {
+  const response = await apiFetch("/api/notes", {
     method: "POST",
     headers: API_HEADERS,
     credentials: "include",
@@ -214,7 +216,7 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
 export const deleteNoteOnServer = async (noteId: string) => {
   if (typeof window === "undefined") return;
   try {
-    const response = await fetch(`/api/notes/${encodeURIComponent(noteId)}`, {
+    const response = await apiFetch(`/api/notes/${encodeURIComponent(noteId)}`, {
       method: "DELETE",
       credentials: "include",
     });

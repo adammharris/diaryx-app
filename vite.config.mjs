@@ -10,7 +10,9 @@ const sanitizeServerData = (value, seen = new WeakMap()) => {
   const valueType = typeof value;
   if (valueType !== "object") {
     if (valueType === "bigint") {
-      return Number.isSafeInteger(Number(value)) ? Number(value) : value.toString();
+      return Number.isSafeInteger(Number(value))
+        ? Number(value)
+        : value.toString();
     }
     return value;
   }
@@ -26,7 +28,10 @@ const sanitizeServerData = (value, seen = new WeakMap()) => {
     return value.toString();
   }
 
-  if (typeof ReadableStream !== "undefined" && value instanceof ReadableStream) {
+  if (
+    typeof ReadableStream !== "undefined" &&
+    value instanceof ReadableStream
+  ) {
     return undefined;
   }
   if (typeof Response !== "undefined" && value instanceof Response) {
@@ -91,9 +96,7 @@ const QWIK_ENV_PATCHED = Symbol("qwikEnvDataPatched");
 const sanitizeEnvData = (value) => {
   const sanitized = sanitizeServerData(value);
   if (sanitized?.qwikcity) {
-    const qwikcity = { ...sanitized.qwikcity };
-    delete qwikcity.ev;
-    sanitized.qwikcity = qwikcity;
+    // Keep qwikcity.ev intact for dev server
   }
   return sanitized;
 };
@@ -106,7 +109,8 @@ const qwikEnvDataSanitizer = () => ({
     server.middlewares.use((_req, res, next) => {
       if (!res[QWIK_ENV_PATCHED]) {
         const existing = res._qwikEnvData;
-        let store = existing === undefined ? undefined : sanitizeEnvData(existing);
+        let store =
+          existing === undefined ? undefined : sanitizeEnvData(existing);
         Object.defineProperty(res, "_qwikEnvData", {
           configurable: true,
           enumerable: false,

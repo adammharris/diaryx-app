@@ -1,4 +1,5 @@
 import type { DiaryxNote } from "../diaryx/types";
+import { apiFetch } from "./http";
 
 export interface SharedNotesResponse {
   notes: DiaryxNote[];
@@ -9,9 +10,8 @@ export class SharedNotesError extends Error {
 }
 
 export const fetchSharedNotes = async (): Promise<DiaryxNote[]> => {
-  const response = await fetch("/api/shared-notes", {
+  const response = await apiFetch("/api/shared-notes", {
     method: "GET",
-    credentials: "include",
     headers: {
       "Accept": "application/json",
     },
