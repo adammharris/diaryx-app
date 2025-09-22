@@ -1,5 +1,5 @@
 import type { RequestEvent, RequestHandler } from "@builder.io/qwik-city";
-import { auth } from "~/lib/auth";
+import { getAuth } from "~/lib/auth";
 import {
   listNotesForUser,
   upsertNotesForUser,
@@ -11,10 +11,11 @@ const respondUnauthorized = (event: RequestEvent): void => {
   event.json(401, { error: "UNAUTHORIZED" });
 };
 
-const parseUser = async (request: Request) => {
+const parseUser = async (event: RequestEvent) => {
   try {
+    const auth = getAuth(event);
     const session = await auth.api.getSession({
-      headers: request.headers,
+      headers: event.request.headers,
       asResponse: false,
     });
     return session?.user ?? null;
@@ -25,15 +26,14 @@ const parseUser = async (request: Request) => {
 };
 
 export const onGet: RequestHandler = async (event) => {
-  const { request } = event;
-  const user = await parseUser(request);
+  const user = await parseUser(event);
   if (!user) {
     respondUnauthorized(event);
     return;
   }
 
-  const rows = await listNotesForUser(user.id);
-  const terms = await listVisibilityTermsForUser(user.id);
+  const rows = await listNotesForUser(event, user.id);
+  const terms = await listVisibilityTermsForUser(event, user.id);
   event.json(200, {
     notes: rows.map((row) => ({
       id: row.id,
@@ -47,7 +47,7 @@ export const onGet: RequestHandler = async (event) => {
 
 export const onPost: RequestHandler = async (event) => {
   const { request } = event;
-  const user = await parseUser(request);
+  const user = await parseUser(event);
   if (!user) {
     respondUnauthorized(event);
     return;
@@ -86,7 +86,7 @@ export const onPost: RequestHandler = async (event) => {
     }));
 
   if (validNotes.length) {
-    await upsertNotesForUser(user.id, validNotes);
+    await upsertNotesForUser(event, user.id, validNotes);
   }
 
   const validTerms = visibilityTermsPayload
@@ -105,6 +105,7 @@ export const onPost: RequestHandler = async (event) => {
 
   if (validTerms.length) {
     await updateVisibilityTermsForUser(
+      event,
       user.id,
       Object.fromEntries(
         validTerms.map(({ term, emails }: { term: string; emails: string[] }) => [
@@ -115,8 +116,8 @@ export const onPost: RequestHandler = async (event) => {
     );
   }
 
-  const rows = await listNotesForUser(user.id);
-  const terms = await listVisibilityTermsForUser(user.id);
+  const rows = await listNotesForUser(event, user.id);
+  const terms = await listVisibilityTermsForUser(event, user.id);
   event.json(200, {
     notes: rows.map((row) => ({
       id: row.id,

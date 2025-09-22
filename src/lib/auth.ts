@@ -1,7 +1,11 @@
+import type { RequestEvent } from "@builder.io/qwik-city";
 import { betterAuth } from "better-auth";
 import { Pool } from "@neondatabase/serverless";
 
 const missingEnvMessage = "DATABASE_URL environment variable is required for auth";
+
+const poolCache = new Map<string, Pool>();
+const authCache = new Map<string, ReturnType<typeof betterAuth>>();
 
 const createAuthStub = (): ReturnType<typeof betterAuth> =>
   ({
@@ -15,31 +19,43 @@ const createAuthStub = (): ReturnType<typeof betterAuth> =>
     },
   } as unknown as ReturnType<typeof betterAuth>);
 
-let pooledConnection: Pool | undefined;
-let resolvedAuth: ReturnType<typeof betterAuth> | undefined;
+const readDatabaseUrl = (event?: RequestEvent) => {
+  const fromEvent = event?.env?.get?.("DATABASE_URL");
+  if (fromEvent && fromEvent.length > 0) {
+    return fromEvent;
+  }
+  const fromProcess = process.env.DATABASE_URL;
+  return fromProcess && fromProcess.length > 0 ? fromProcess : undefined;
+};
 
-const resolvePool = (): Pool | undefined => {
-  if (pooledConnection) {
-    return pooledConnection;
-  }
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    return undefined;
-  }
-  pooledConnection = new Pool({
+const createPool = (databaseUrl: string) =>
+  new Pool({
     connectionString: databaseUrl,
     ssl: databaseUrl.includes("sslmode=") ? undefined : { rejectUnauthorized: false },
   });
-  return pooledConnection;
+
+export const getDbPool = (event?: RequestEvent): Pool => {
+  const databaseUrl = readDatabaseUrl(event);
+  if (!databaseUrl) {
+    throw new Error(missingEnvMessage);
+  }
+  let pool = poolCache.get(databaseUrl);
+  if (!pool) {
+    pool = createPool(databaseUrl);
+    poolCache.set(databaseUrl, pool);
+  }
+  return pool;
 };
 
-const resolveAuth = (): ReturnType<typeof betterAuth> => {
-  const pool = resolvePool();
-  if (!pool) {
+export const getAuth = (event?: RequestEvent): ReturnType<typeof betterAuth> => {
+  const databaseUrl = readDatabaseUrl(event);
+  if (!databaseUrl) {
     return createAuthStub();
   }
-  if (!resolvedAuth) {
-    resolvedAuth = betterAuth({
+  let auth = authCache.get(databaseUrl);
+  if (!auth) {
+    const pool = getDbPool(event);
+    auth = betterAuth({
       database: pool,
       emailAndPassword: {
         enabled: true,
@@ -49,41 +65,9 @@ const resolveAuth = (): ReturnType<typeof betterAuth> => {
         "https://*adammharris-projects.vercel.app",
       ],
     });
+    authCache.set(databaseUrl, auth);
   }
-  return resolvedAuth;
+  return auth;
 };
 
-const createProxy = <T extends object>(resolver: () => T) =>
-  new Proxy({} as T, {
-    get(_target, prop, receiver) {
-      const instance = resolver();
-      const value = Reflect.get(instance, prop, receiver);
-      return typeof value === "function" ? value.bind(instance) : value;
-    },
-    has(_target, prop) {
-      const instance = resolver();
-      return prop in instance;
-    },
-    ownKeys() {
-      const instance = resolver();
-      return Reflect.ownKeys(instance);
-    },
-    getOwnPropertyDescriptor(_target, prop) {
-      const instance = resolver();
-      const descriptor = Reflect.getOwnPropertyDescriptor(instance, prop);
-      if (descriptor) {
-        descriptor.configurable = true;
-      }
-      return descriptor;
-    },
-  });
-
-export const auth = createProxy<ReturnType<typeof betterAuth>>(resolveAuth);
-
-export const dbPool = createProxy<Pool>(() => {
-  const pool = resolvePool();
-  if (!pool) {
-    throw new Error(missingEnvMessage);
-  }
-  return pool;
-});
+export type AuthInstance = ReturnType<typeof betterAuth>;

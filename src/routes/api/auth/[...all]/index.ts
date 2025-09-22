@@ -1,7 +1,8 @@
 import type { RequestHandler } from "@builder.io/qwik-city";
-import { auth } from "~/lib/auth";
+import { getAuth } from "~/lib/auth";
 
 export const onRequest: RequestHandler = async (event) => {
+  const auth = getAuth(event);
   const response = await auth.handler(event.request);
   const headers = new Headers();
   response.headers.forEach((value, key) => {

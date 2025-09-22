@@ -5,7 +5,7 @@ import type {
   RemoteVisibilityTerm,
   SyncRequestPayload,
 } from "../sync/note-sync-types";
-import { auth } from "../auth";
+import { getAuth } from "../auth";
 import {
   listNotesForUser,
   upsertNotesForUser,
@@ -25,6 +25,7 @@ const mapDbNotes = (rows: Awaited<ReturnType<typeof listNotesForUser>>) =>
 export const syncNotesOnServer = server$(
   async function (payload: SyncRequestPayload) {
     const event = this as RequestEvent;
+    const auth = getAuth(event);
     const session = await auth.api.getSession({
       headers: event.request.headers,
       asResponse: false,
@@ -51,7 +52,7 @@ export const syncNotesOnServer = server$(
       }));
 
     if (validNotes.length) {
-      await upsertNotesForUser(session.user.id, validNotes);
+      await upsertNotesForUser(event, session.user.id, validNotes);
     }
 
     const validTerms = payload.visibilityTerms
@@ -70,13 +71,14 @@ export const syncNotesOnServer = server$(
 
     if (validTerms.length) {
       await updateVisibilityTermsForUser(
+        event,
         session.user.id,
         Object.fromEntries(validTerms.map(({ term, emails }) => [term, emails]))
       );
     }
 
-    const rows = await listNotesForUser(session.user.id);
-    const terms = await listVisibilityTermsForUser(session.user.id);
+    const rows = await listNotesForUser(event, session.user.id);
+    const terms = await listVisibilityTermsForUser(event, session.user.id);
 
     return {
       status: 200 as const,
@@ -91,6 +93,7 @@ export const syncNotesOnServer = server$(
 export const deleteNoteOnServerRpc = server$(
   async function (noteId: string) {
     const event = this as RequestEvent;
+    const auth = getAuth(event);
     const session = await auth.api.getSession({
       headers: event.request.headers,
       asResponse: false,
@@ -99,7 +102,7 @@ export const deleteNoteOnServerRpc = server$(
       return { status: 401 as const };
     }
 
-    await deleteNoteForUser(session.user.id, noteId);
+    await deleteNoteForUser(event, session.user.id, noteId);
     return { status: 204 as const };
   }
 );

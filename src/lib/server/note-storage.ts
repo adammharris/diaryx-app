@@ -1,5 +1,6 @@
+import type { RequestEvent } from "@builder.io/qwik-city";
 import type { Pool } from "@neondatabase/serverless";
-import { dbPool } from "../auth";
+import { getDbPool } from "../auth";
 
 interface SyncInputNote {
   id: string;
@@ -19,10 +20,13 @@ export interface DbSharedNote extends DbNote {
   user_id: string;
 }
 
-let tableEnsured = false;
+const ensuredPools = new WeakSet<Pool>();
 
-const ensureNotesTable = async (pool: Pool) => {
-  if (tableEnsured) return;
+const ensureNotesTable = async (event: RequestEvent): Promise<Pool> => {
+  const pool = getDbPool(event);
+  if (ensuredPools.has(pool)) {
+    return pool;
+  }
   await pool.query(`
     CREATE TABLE IF NOT EXISTS diaryx_note (
       user_id TEXT NOT NULL,
@@ -44,12 +48,16 @@ const ensureNotesTable = async (pool: Pool) => {
       PRIMARY KEY (user_id, term)
     );
   `);
-  tableEnsured = true;
+  ensuredPools.add(pool);
+  return pool;
 };
 
-export const listNotesForUser = async (userId: string): Promise<DbNote[]> => {
-  await ensureNotesTable(dbPool);
-  const result = await dbPool.query<DbNote>(
+export const listNotesForUser = async (
+  event: RequestEvent,
+  userId: string
+): Promise<DbNote[]> => {
+  const pool = await ensureNotesTable(event);
+  const result = await pool.query<DbNote>(
     `SELECT id, markdown, source_name, last_modified
        FROM diaryx_note
       WHERE user_id = $1
@@ -59,9 +67,12 @@ export const listNotesForUser = async (userId: string): Promise<DbNote[]> => {
   return result.rows;
 };
 
-export const listVisibilityTermsForUser = async (userId: string) => {
-  await ensureNotesTable(dbPool);
-  const result = await dbPool.query<{ term: string; emails: string[] }>(
+export const listVisibilityTermsForUser = async (
+  event: RequestEvent,
+  userId: string
+) => {
+  const pool = await ensureNotesTable(event);
+  const result = await pool.query<{ term: string; emails: string[] }>(
     `SELECT term, emails
        FROM diaryx_visibility_term
       WHERE user_id = $1
@@ -71,14 +82,18 @@ export const listVisibilityTermsForUser = async (userId: string) => {
   return result.rows;
 };
 
-export const upsertNotesForUser = async (userId: string, notes: SyncInputNote[]) => {
+export const upsertNotesForUser = async (
+  event: RequestEvent,
+  userId: string,
+  notes: SyncInputNote[]
+) => {
   if (!notes.length) return;
-  await ensureNotesTable(dbPool);
+  const pool = await ensureNotesTable(event);
   const queries = notes.map((note) => {
     const lastModified = Number.isFinite(note.lastModified)
       ? Number(note.lastModified)
       : Date.now();
-    return dbPool.query(
+    return pool.query(
       `INSERT INTO diaryx_note (user_id, id, markdown, source_name, last_modified, updated_at)
          VALUES ($1, $2, $3, $4, $5, NOW())
          ON CONFLICT (user_id, id) DO UPDATE
@@ -93,33 +108,37 @@ export const upsertNotesForUser = async (userId: string, notes: SyncInputNote[])
   await Promise.all(queries);
 };
 
-export const deleteAllNotesForUser = async (userId: string) => {
-  await ensureNotesTable(dbPool);
-  await dbPool.query(`DELETE FROM diaryx_note WHERE user_id = $1`, [userId]);
-  await dbPool.query(`DELETE FROM diaryx_visibility_term WHERE user_id = $1`, [userId]);
+export const deleteAllNotesForUser = async (event: RequestEvent, userId: string) => {
+  const pool = await ensureNotesTable(event);
+  await pool.query(`DELETE FROM diaryx_note WHERE user_id = $1`, [userId]);
+  await pool.query(`DELETE FROM diaryx_visibility_term WHERE user_id = $1`, [userId]);
 };
 
-export const deleteNoteForUser = async (userId: string, noteId: string) => {
-  await ensureNotesTable(dbPool);
-  await dbPool.query(`DELETE FROM diaryx_note WHERE user_id = $1 AND id = $2`, [userId, noteId]);
+export const deleteNoteForUser = async (
+  event: RequestEvent,
+  userId: string,
+  noteId: string
+) => {
+  const pool = await ensureNotesTable(event);
+  await pool.query(`DELETE FROM diaryx_note WHERE user_id = $1 AND id = $2`, [userId, noteId]);
 };
 
 export const updateVisibilityTermsForUser = async (
+  event: RequestEvent,
   userId: string,
   terms: Record<string, string[]>
 ) => {
-  await ensureNotesTable(dbPool);
-  const client = dbPool;
+  const pool = await ensureNotesTable(event);
   const termEntries = Object.entries(terms).map(([term, emails]) => ({
     term,
     emails: Array.from(new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))),
   }));
 
-  await client.query(`DELETE FROM diaryx_visibility_term WHERE user_id = $1`, [userId]);
+  await pool.query(`DELETE FROM diaryx_visibility_term WHERE user_id = $1`, [userId]);
   if (!termEntries.length) return;
 
   const insertPromises = termEntries.map(({ term, emails }) =>
-    client.query(
+    pool.query(
       `INSERT INTO diaryx_visibility_term (user_id, term, emails, updated_at)
          VALUES ($1, $2, $3::text[], NOW())`,
       [userId, term, emails]
@@ -129,10 +148,11 @@ export const updateVisibilityTermsForUser = async (
 };
 
 export const listNotesSharedWithEmail = async (
+  event: RequestEvent,
   email: string
 ): Promise<DbSharedNote[]> => {
-  await ensureNotesTable(dbPool);
-  const result = await dbPool.query<DbSharedNote>(
+  const pool = await ensureNotesTable(event);
+  const result = await pool.query<DbSharedNote>(
     `SELECT user_id, id, markdown, source_name, last_modified
        FROM diaryx_note
       WHERE markdown ILIKE '%' || $1 || '%'

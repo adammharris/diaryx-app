@@ -1,11 +1,12 @@
-import type { RequestHandler } from "@builder.io/qwik-city";
-import { auth } from "~/lib/auth";
+import type { RequestEvent, RequestHandler } from "@builder.io/qwik-city";
+import { getAuth } from "~/lib/auth";
 import { deleteNoteForUser } from "~/lib/server/note-storage";
 
-const parseUser = async (request: Request) => {
+const parseUser = async (event: RequestEvent) => {
   try {
+    const auth = getAuth(event);
     const session = await auth.api.getSession({
-      headers: request.headers,
+      headers: event.request.headers,
       asResponse: false,
     });
     return session?.user ?? null;
@@ -16,8 +17,8 @@ const parseUser = async (request: Request) => {
 };
 
 export const onDelete: RequestHandler = async (event) => {
-  const { request, params } = event;
-  const user = await parseUser(request);
+  const { params } = event;
+  const user = await parseUser(event);
   if (!user) {
     event.json(401, { error: "UNAUTHORIZED" });
     return;
@@ -29,6 +30,6 @@ export const onDelete: RequestHandler = async (event) => {
     return;
   }
 
-  await deleteNoteForUser(user.id, noteId);
+  await deleteNoteForUser(event, user.id, noteId);
   event.json(200, { status: "deleted" });
 };

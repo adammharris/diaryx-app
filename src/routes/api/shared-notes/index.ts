@@ -1,5 +1,5 @@
 import type { RequestEvent, RequestHandler } from "@builder.io/qwik-city";
-import { auth } from "~/lib/auth";
+import { getAuth } from "~/lib/auth";
 import { listNotesSharedWithEmail } from "~/lib/server/note-storage";
 import { parseDiaryxString } from "~/lib/diaryx/parser";
 import type { DiaryxNote } from "~/lib/diaryx/types";
@@ -12,10 +12,11 @@ const respondBadRequest = (event: RequestEvent, message: string) => {
   event.json(400, { error: message });
 };
 
-const parseUser = async (request: Request) => {
+const parseUser = async (event: RequestEvent) => {
   try {
+    const auth = getAuth(event);
     const session = await auth.api.getSession({
-      headers: request.headers,
+      headers: event.request.headers,
       asResponse: false,
     });
     return session?.user ?? null;
@@ -61,8 +62,7 @@ const hasSharedAccess = (note: DiaryxNote, email: string): boolean => {
 };
 
 export const onGet: RequestHandler = async (event) => {
-  const { request } = event;
-  const user = await parseUser(request);
+  const user = await parseUser(event);
   if (!user) {
     respondUnauthorized(event);
     return;
@@ -74,7 +74,7 @@ export const onGet: RequestHandler = async (event) => {
     return;
   }
 
-  const rows = await listNotesSharedWithEmail(userEmail);
+  const rows = await listNotesSharedWithEmail(event, userEmail);
   const notes: DiaryxNote[] = [];
   const seen = new Set<string>();
 
