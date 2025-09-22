@@ -11,8 +11,23 @@ export const readServerEnvValue = (
   if (isNonEmpty(fromEvent)) {
     return fromEvent;
   }
-  const fromProcess =
-    typeof process !== "undefined" && process?.env ? process.env[key] : undefined;
+  let fromProcess: string | undefined;
+  if (typeof process !== "undefined" && process?.env) {
+    switch (key) {
+      case "DATABASE_URL":
+        fromProcess = process.env.DATABASE_URL;
+        break;
+      case "BETTER_AUTH_SECRET":
+        fromProcess = process.env.BETTER_AUTH_SECRET;
+        break;
+      case "BETTER_AUTH_URL":
+        fromProcess = process.env.BETTER_AUTH_URL;
+        break;
+      default:
+        fromProcess = process.env[key];
+        break;
+    }
+  }
   return isNonEmpty(fromProcess) ? fromProcess : undefined;
 };
 
