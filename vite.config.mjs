@@ -86,20 +86,38 @@ const sanitizeServerData = (value, seen = new WeakMap()) => {
   return output;
 };
 
+const QWIK_ENV_PATCHED = Symbol("qwikEnvDataPatched");
+
+const sanitizeEnvData = (value) => {
+  const sanitized = sanitizeServerData(value);
+  if (sanitized?.qwikcity) {
+    const qwikcity = { ...sanitized.qwikcity };
+    delete qwikcity.ev;
+    sanitized.qwikcity = qwikcity;
+  }
+  return sanitized;
+};
+
 const qwikEnvDataSanitizer = () => ({
   name: "qwik-env-data-sanitizer",
+  enforce: "pre",
   apply: "serve",
   configureServer(server) {
     server.middlewares.use((_req, res, next) => {
-      const envData = res._qwikEnvData;
-      if (envData?.qwikcity?.ev) {
-        const sanitized = sanitizeServerData(envData);
-        if (sanitized?.qwikcity) {
-          const qwikcity = { ...sanitized.qwikcity };
-          delete qwikcity.ev;
-          sanitized.qwikcity = qwikcity;
-        }
-        res._qwikEnvData = sanitized;
+      if (!res[QWIK_ENV_PATCHED]) {
+        const existing = res._qwikEnvData;
+        let store = existing === undefined ? undefined : sanitizeEnvData(existing);
+        Object.defineProperty(res, "_qwikEnvData", {
+          configurable: true,
+          enumerable: false,
+          get() {
+            return store;
+          },
+          set(value) {
+            store = value === undefined ? undefined : sanitizeEnvData(value);
+          },
+        });
+        res[QWIK_ENV_PATCHED] = true;
       }
       next();
     });
@@ -124,7 +142,12 @@ export default defineConfig(({ command, mode }) => {
   };
 
   return {
-    plugins: [qwikCity(), qwikEnvDataSanitizer(), qwikVite(), tsconfigPaths({ root: "." })],
+    plugins: [
+      qwikEnvDataSanitizer(),
+      qwikCity(),
+      qwikVite(),
+      tsconfigPaths({ root: "." }),
+    ],
     optimizeDeps: {
       exclude: [],
     },
