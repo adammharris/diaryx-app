@@ -11,7 +11,8 @@ export const readServerEnvValue = (
   if (isNonEmpty(fromEvent)) {
     return fromEvent;
   }
-  const fromProcess = process.env?.[key];
+  const fromProcess =
+    typeof process !== "undefined" && process?.env ? process.env[key] : undefined;
   return isNonEmpty(fromProcess) ? fromProcess : undefined;
 };
 
