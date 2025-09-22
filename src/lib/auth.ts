@@ -1,6 +1,7 @@
 import type { RequestEvent } from "@builder.io/qwik-city";
 import { betterAuth } from "better-auth";
 import { Pool } from "@neondatabase/serverless";
+import { readServerEnvValue } from "./server/env";
 
 const missingDatabaseMessage = "DATABASE_URL environment variable is required for auth";
 const missingSecretMessage = "BETTER_AUTH_SECRET environment variable is required for auth";
@@ -20,24 +21,6 @@ const createAuthStub = (message: string): ReturnType<typeof betterAuth> =>
     },
   } as unknown as ReturnType<typeof betterAuth>);
 
-const readDatabaseUrl = (event?: RequestEvent) => {
-  const fromEvent = event?.env?.get?.("DATABASE_URL");
-  if (fromEvent && fromEvent.length > 0) {
-    return fromEvent;
-  }
-  const fromProcess = process.env.DATABASE_URL;
-  return fromProcess && fromProcess.length > 0 ? fromProcess : undefined;
-};
-
-const readAuthSecret = (event?: RequestEvent) => {
-  const fromEvent = event?.env?.get?.("BETTER_AUTH_SECRET");
-  if (fromEvent && fromEvent.length > 0) {
-    return fromEvent;
-  }
-  const fromProcess = process.env.BETTER_AUTH_SECRET;
-  return fromProcess && fromProcess.length > 0 ? fromProcess : undefined;
-};
-
 const createPool = (databaseUrl: string) =>
   new Pool({
     connectionString: databaseUrl,
@@ -45,7 +28,7 @@ const createPool = (databaseUrl: string) =>
   });
 
 export const getDbPool = (event?: RequestEvent): Pool => {
-  const databaseUrl = readDatabaseUrl(event);
+  const databaseUrl = readServerEnvValue(event, "DATABASE_URL");
   if (!databaseUrl) {
     throw new Error(missingDatabaseMessage);
   }
@@ -58,11 +41,11 @@ export const getDbPool = (event?: RequestEvent): Pool => {
 };
 
 export const getAuth = (event?: RequestEvent): ReturnType<typeof betterAuth> => {
-  const databaseUrl = readDatabaseUrl(event);
+  const databaseUrl = readServerEnvValue(event, "DATABASE_URL");
   if (!databaseUrl) {
     return createAuthStub(missingDatabaseMessage);
   }
-  const secret = readAuthSecret(event);
+  const secret = readServerEnvValue(event, "BETTER_AUTH_SECRET");
   if (!secret) {
     return createAuthStub(missingSecretMessage);
   }

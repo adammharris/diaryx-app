@@ -47,6 +47,11 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
     visibilityTerms: visibilityTermsPayload,
   });
 
+  if (!response || typeof response.status !== "number") {
+    console.warn("Unexpected response from syncNotesOnServer", response);
+    return;
+  }
+
   if (response.status === 401) {
     return;
   }
