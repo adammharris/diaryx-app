@@ -657,3 +657,7 @@ export const head: DocumentHead = {
     },
   ],
 };
+
+export const config = {
+  runtime: "nodejs22.x",
+};
