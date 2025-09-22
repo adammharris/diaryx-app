@@ -38,8 +38,11 @@ const ensureNotesTable = async (event: RequestEvent): Promise<Pool> => {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (user_id, id)
     );
-    CREATE INDEX IF NOT EXISTS diaryx_note_user_updated_idx
-      ON diaryx_note (user_id, updated_at DESC);
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS diaryx_note_user_updated_idx ON diaryx_note (user_id, updated_at DESC);`
+  );
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS diaryx_visibility_term (
       user_id TEXT NOT NULL,
       term TEXT NOT NULL,

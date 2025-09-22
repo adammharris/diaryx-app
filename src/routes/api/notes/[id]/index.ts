@@ -33,3 +33,7 @@ export const onDelete: RequestHandler = async (event) => {
   await deleteNoteForUser(event, user.id, noteId);
   event.json(200, { status: "deleted" });
 };
+
+export const config = {
+  runtime: "nodejs22.x",
+};

@@ -128,3 +128,7 @@ export const onPost: RequestHandler = async (event) => {
     visibilityTerms: terms,
   });
 };
+
+export const config = {
+  runtime: "nodejs22.x",
+};

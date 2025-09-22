@@ -108,3 +108,7 @@ export const onGet: RequestHandler = async (event) => {
 
   event.json(200, { notes });
 };
+
+export const config = {
+  runtime: "nodejs22.x",
+};

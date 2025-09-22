@@ -49,15 +49,19 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
 
   if (!response || typeof response.status !== "number") {
     console.warn("Unexpected response from syncNotesOnServer", response);
-    return;
+    throw new Error("Unexpected sync response from server");
   }
 
   if (response.status === 401) {
-    return;
+    throw new Error("You must be signed in to sync notes.");
   }
 
   if (response.status !== 200 || !response.data) {
-    throw new Error("Failed to sync notes");
+    const message =
+      (response as any)?.error?.message ||
+      (response as any)?.message ||
+      "Failed to sync notes.";
+    throw new Error(message);
   }
 
   const remoteNotes = Array.isArray(response.data.notes) ? response.data.notes : [];

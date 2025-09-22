@@ -18,3 +18,7 @@ export const onRequest: RequestHandler = async (event) => {
 
   event.send(safeResponse);
 };
+
+export const config = {
+  runtime: "nodejs22.x",
+};
