@@ -4,7 +4,6 @@ import type { DiaryxNote } from "../diaryx/types";
 import type { DiaryxSessionState } from "../state/diaryx-context";
 import { persistMarkdownNotes } from "../persistence/markdown-store";
 import { createDiaryxRepository } from "../persistence/diaryx-repository";
-import { syncNotesOnServer, deleteNoteOnServerRpc } from "../server/note-rpc";
 import type { RemoteNotePayload, RemoteVisibilityTerm } from "./note-sync-types";
 
 const buildPayload = (note: DiaryxNote) => ({
@@ -30,43 +29,68 @@ const parseRemoteNote = (payload: RemoteNotePayload): DiaryxNote | null => {
   }
 };
 
+const API_HEADERS = {
+  "Content-Type": "application/json",
+};
+
+const toVisibilityPayload = (visibility: Record<string, string[]> | undefined) =>
+  visibility
+    ? Object.entries(visibility).map(([term, emails]) => ({
+        term,
+        emails: Array.from(
+          new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))
+        ),
+      }))
+    : [];
+
+const readSyncResponse = async (response: Response) => {
+  const status = response.status;
+  let data: unknown = null;
+  try {
+    data = await response.json();
+  } catch (error) {
+    console.warn("Failed to parse sync response", error);
+  }
+  return { status, data };
+};
+
 export const syncNotesWithServer = async (session: DiaryxSessionState) => {
   if (typeof window === "undefined") return;
 
   const payload = session.notes.map(buildPayload);
   const localMarkdownById = new Map(payload.map((entry) => [entry.id, entry.markdown]));
-  const visibilityTermsPayload = session.sharedVisibilityEmails
-    ? Object.entries(session.sharedVisibilityEmails).map(([term, emails]) => ({
-        term,
-        emails: Array.from(new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))),
-      }))
-    : [];
+  const visibilityTermsPayload = toVisibilityPayload(session.sharedVisibilityEmails);
 
-  const response = await syncNotesOnServer({
-    notes: payload,
-    visibilityTerms: visibilityTermsPayload,
+  const response = await fetch("/api/notes", {
+    method: "POST",
+    headers: API_HEADERS,
+    credentials: "include",
+    body: JSON.stringify({
+      notes: payload,
+      visibilityTerms: visibilityTermsPayload,
+    }),
   });
 
-  if (!response || typeof response.status !== "number") {
-    console.warn("Unexpected response from syncNotesOnServer", response);
-    throw new Error("Unexpected sync response from server");
-  }
+  const { status, data } = await readSyncResponse(response);
 
-  if (response.status === 401) {
+  if (status === 401) {
     throw new Error("You must be signed in to sync notes.");
   }
 
-  if (response.status !== 200 || !response.data) {
+  if (status !== 200 || typeof data !== "object" || data === null) {
     const message =
-      (response as any)?.error?.message ||
-      (response as any)?.message ||
+      (data as any)?.error?.message ||
+      (data as any)?.message ||
+      response.statusText ||
       "Failed to sync notes.";
     throw new Error(message);
   }
 
-  const remoteNotes = Array.isArray(response.data.notes) ? response.data.notes : [];
-  const remoteVisibilityTerms = Array.isArray(response.data.visibilityTerms)
-    ? response.data.visibilityTerms
+  const remoteNotes = Array.isArray((data as any).notes) ? (data as any).notes : [];
+  const remoteVisibilityTerms: RemoteVisibilityTerm[] = Array.isArray(
+    (data as any).visibilityTerms
+  )
+    ? ((data as any).visibilityTerms as RemoteVisibilityTerm[])
     : [];
   const parsed: DiaryxNote[] = [];
   const remoteMarkdownById = new Map<string, string>();
@@ -164,7 +188,13 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
 export const deleteNoteOnServer = async (noteId: string) => {
   if (typeof window === "undefined") return;
   try {
-    await deleteNoteOnServerRpc(noteId);
+    const response = await fetch(`/api/notes/${encodeURIComponent(noteId)}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!response.ok && response.status !== 404) {
+      console.warn("Failed to delete note on server", await response.text());
+    }
   } catch (error) {
     console.warn("Failed to delete note on server", error);
   }
