@@ -403,77 +403,80 @@ export default component$(() => {
     { strategy: "document-ready" },
   );
 
-  useTask$(async () => {
-    if (!hasAuthClient()) return;
-    const client = await getAuthClient();
+  useVisibleTask$(
+    async () => {
+      if (!hasAuthClient()) return;
+      const client = await getAuthClient();
 
-    // Proactively hydrate the session from the server to ensure the client store is up-to-date
-    try {
-      console.debug("[auth] hydrating session via getSession()");
-      const sessionRes = await client.getSession({
-        fetchOptions: { credentials: "include" },
-      });
-      const hydratedUserId = (sessionRes as any)?.data?.user?.id ?? null;
-      if (hydratedUserId && currentUserId.value !== hydratedUserId) {
-        currentUserId.value = hydratedUserId;
-        console.debug("[auth] set userId from getSession:", hydratedUserId);
-      }
-      console.debug("[auth] hydrate complete");
-    } catch (e) {
-      console.warn("[auth] getSession failed", e);
-    }
-
-    const store = client.useSession;
-    const initial = store.get();
-    const initialUserId = initial?.data?.user?.id ?? null;
-    console.debug(
-      "[auth] initial useSession value:",
-      initial,
-      "userId:",
-      initialUserId,
-    );
-    currentUserId.value = initialUserId;
-    if (!currentUserId.value) {
+      // Proactively hydrate the session from the server to ensure the client store is up-to-date
       try {
-        console.debug("[auth] fallback /api/auth/get-session");
-        const res = await apiFetch("/api/auth/get-session", {
-          method: "GET",
-          credentials: "include",
-          headers: { Accept: "application/json" },
+        console.debug("[auth] hydrating session via getSession()");
+        const sessionRes = await client.getSession({
+          fetchOptions: { credentials: "include" },
         });
-        if (res.ok) {
-          const data = await res.json().catch(() => null);
-          const uid =
-            (data as any)?.data?.user?.id ?? (data as any)?.user?.id ?? null;
-          if (uid) {
-            currentUserId.value = uid;
-            console.debug("[auth] set userId from fallback:", uid);
-          }
-        } else {
-          console.warn("[auth] fallback get-session non-OK", res.status);
+        const hydratedUserId = (sessionRes as any)?.data?.user?.id ?? null;
+        if (hydratedUserId && currentUserId.value !== hydratedUserId) {
+          currentUserId.value = hydratedUserId;
+          console.debug("[auth] set userId from getSession:", hydratedUserId);
         }
-      } catch (err) {
-        console.warn("[auth] fallback get-session failed", err);
+        console.debug("[auth] hydrate complete");
+      } catch (e) {
+        console.warn("[auth] getSession failed", e);
       }
-    }
 
-    const unsubscribe = store.subscribe((value) => {
-      const nextValue = value as typeof initial;
-      const userId = nextValue?.data?.user?.id ?? null;
-      if (currentUserId.value !== userId) {
-        console.debug(
-          "[auth] userId changed:",
-          currentUserId.value,
-          "->",
-          userId,
-          "value:",
-          nextValue,
-        );
-        currentUserId.value = userId;
+      const store = client.useSession;
+      const initial = store.get();
+      const initialUserId = initial?.data?.user?.id ?? null;
+      console.debug(
+        "[auth] initial useSession value:",
+        initial,
+        "userId:",
+        initialUserId,
+      );
+      currentUserId.value = initialUserId;
+      if (!currentUserId.value) {
+        try {
+          console.debug("[auth] fallback /api/auth/get-session");
+          const res = await apiFetch("/api/auth/get-session", {
+            method: "GET",
+            credentials: "include",
+            headers: { Accept: "application/json" },
+          });
+          if (res.ok) {
+            const data = await res.json().catch(() => null);
+            const uid =
+              (data as any)?.data?.user?.id ?? (data as any)?.user?.id ?? null;
+            if (uid) {
+              currentUserId.value = uid;
+              console.debug("[auth] set userId from fallback:", uid);
+            }
+          } else {
+            console.warn("[auth] fallback get-session non-OK", res.status);
+          }
+        } catch (err) {
+          console.warn("[auth] fallback get-session failed", err);
+        }
       }
-    });
-    return () => unsubscribe();
-  });
+
+      const unsubscribe = store.subscribe((value) => {
+        const nextValue = value as typeof initial;
+        const userId = nextValue?.data?.user?.id ?? null;
+        if (currentUserId.value !== userId) {
+          console.debug(
+            "[auth] userId changed:",
+            currentUserId.value,
+            "->",
+            userId,
+            "value:",
+            nextValue,
+          );
+          currentUserId.value = userId;
+        }
+      });
+      return () => unsubscribe();
+    },
+    { strategy: "document-ready" },
+  );
 
   useTask$(async ({ track }) => {
     track(() => session.notes.length);
