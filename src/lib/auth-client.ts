@@ -35,6 +35,10 @@ export const getAuthClient = async (): Promise<AuthClient> => {
     clientPromise = import("better-auth/client").then(({ createAuthClient }) =>
       createAuthClient({
         baseURL: getBaseURL(),
+        fetchOptions: {
+          // Ensure cookies are set/sent for cross-origin requests
+          credentials: "include",
+        },
       })
     );
   }
