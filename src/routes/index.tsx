@@ -20,6 +20,7 @@ import {
 import { useDiaryxSessionProvider } from "../lib/state/use-diaryx-session";
 import type { ThemePreference, ColorAccent } from "../lib/state/diaryx-context";
 import { syncNotesWithServer } from "../lib/sync/note-sync";
+import { apiFetch } from "../lib/api/http";
 
 const ACCENT_VALUES: readonly ColorAccent[] = [
   "violet",
@@ -405,13 +406,69 @@ export default component$(() => {
   useTask$(async () => {
     if (!hasAuthClient()) return;
     const client = await getAuthClient();
+
+    // Proactively hydrate the session from the server to ensure the client store is up-to-date
+    try {
+      console.debug("[auth] hydrating session via getSession()");
+      const sessionRes = await client.getSession({
+        fetchOptions: { credentials: "include" },
+      });
+      const hydratedUserId = (sessionRes as any)?.data?.user?.id ?? null;
+      if (hydratedUserId && currentUserId.value !== hydratedUserId) {
+        currentUserId.value = hydratedUserId;
+        console.debug("[auth] set userId from getSession:", hydratedUserId);
+      }
+      console.debug("[auth] hydrate complete");
+    } catch (e) {
+      console.warn("[auth] getSession failed", e);
+    }
+
     const store = client.useSession;
     const initial = store.get();
-    currentUserId.value = initial?.data?.user?.id ?? null;
+    const initialUserId = initial?.data?.user?.id ?? null;
+    console.debug(
+      "[auth] initial useSession value:",
+      initial,
+      "userId:",
+      initialUserId,
+    );
+    currentUserId.value = initialUserId;
+    if (!currentUserId.value) {
+      try {
+        console.debug("[auth] fallback /api/auth/get-session");
+        const res = await apiFetch("/api/auth/get-session", {
+          method: "GET",
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          const uid =
+            (data as any)?.data?.user?.id ?? (data as any)?.user?.id ?? null;
+          if (uid) {
+            currentUserId.value = uid;
+            console.debug("[auth] set userId from fallback:", uid);
+          }
+        } else {
+          console.warn("[auth] fallback get-session non-OK", res.status);
+        }
+      } catch (err) {
+        console.warn("[auth] fallback get-session failed", err);
+      }
+    }
+
     const unsubscribe = store.subscribe((value) => {
       const nextValue = value as typeof initial;
       const userId = nextValue?.data?.user?.id ?? null;
       if (currentUserId.value !== userId) {
+        console.debug(
+          "[auth] userId changed:",
+          currentUserId.value,
+          "->",
+          userId,
+          "value:",
+          nextValue,
+        );
         currentUserId.value = userId;
       }
     });
@@ -463,16 +520,28 @@ export default component$(() => {
     track(() => session.notes.length);
     track(() => session.notes.map((note) => note.lastModified));
     track(() => currentUserId.value);
-    if (!notesHydrated.value) return;
+    track(() => notesHydrated.value);
+
+    if (!notesHydrated.value) {
+      console.debug("[sync] skip: notes not hydrated yet");
+      return;
+    }
+
     const userId = currentUserId.value;
-    if (!userId) return;
+    if (!userId) {
+      console.debug("[sync] skip: no user id");
+      return;
+    }
 
     let cancelled = false;
+    console.debug("[sync] scheduling in 750ms; notes:", session.notes.length);
     const timer = setTimeout(async () => {
       if (cancelled) return;
       try {
+        console.debug("[sync] begin syncNotesWithServer");
         isSyncing.value = true;
         await syncNotesWithServer(session);
+        console.debug("[sync] completed");
       } catch (error) {
         console.warn("Note sync failed", error);
       } finally {
@@ -529,6 +598,28 @@ export default component$(() => {
       document.body.removeAttribute("data-drawer-open");
     });
   });
+
+  // Refresh auth session when tab becomes visible (ensures currentUserId is set)
+  useOnDocument(
+    "visibilitychange",
+    $(async () => {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState !== "visible") return;
+      if (!hasAuthClient()) return;
+      try {
+        const client = await getAuthClient();
+        await client.getSession({ fetchOptions: { credentials: "include" } });
+        const value = client.useSession.get();
+        const uid = value?.data?.user?.id ?? null;
+        if (uid && currentUserId.value !== uid) {
+          console.debug("[auth] visibility refresh userId:", uid);
+          currentUserId.value = uid;
+        }
+      } catch (e) {
+        console.warn("[auth] visibility getSession failed", e);
+      }
+    }),
+  );
 
   // Global click-away for mobile drawers using Qwik's document listener
   useOnDocument(

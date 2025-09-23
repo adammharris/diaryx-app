@@ -87,6 +87,7 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
   const localMarkdownById = new Map(payload.map((entry) => [entry.id, entry.markdown]));
   const visibilityTermsPayload = toVisibilityPayload(session.sharedVisibilityEmails);
 
+  console.debug("[sync] POST /api/notes", { noteCount: payload.length, ids: payload.map((p) => p.id).slice(0, 20), visibilityTermsCount: visibilityTermsPayload.length });
   const response = await apiFetch("/api/notes", {
     method: "POST",
     headers: API_HEADERS,
@@ -98,6 +99,7 @@ export const syncNotesWithServer = async (session: DiaryxSessionState) => {
   });
 
   const { status, data, text } = await readSyncResponse(response);
+  console.debug("[sync] /api/notes response", { status, ok: (response as any)?.ok, data, text });
 
   if (status === 401) {
     throw new Error("You must be signed in to sync notes.");
