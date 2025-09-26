@@ -14,6 +14,8 @@ interface CodeMirrorEditorProps {
   onChange$: PropFunction<(next: string) => void>;
   onViewReady$?: PropFunction<(view: unknown) => void>;
   onDispose$?: PropFunction<() => void>;
+  onFocus$?: PropFunction<() => void>;
+  onBlur$?: PropFunction<() => void>;
   variant?: "default" | "live";
 }
 
@@ -24,6 +26,8 @@ export const CodeMirrorEditor = component$(
     onChange$,
     onViewReady$,
     onDispose$,
+    onFocus$,
+    onBlur$,
     variant = "default",
   }: CodeMirrorEditorProps) => {
     const containerRef = useSignal<HTMLDivElement>();
@@ -288,6 +292,24 @@ export const CodeMirrorEditor = component$(
         editorViewSignal.value = view;
         editorReady.value = true;
 
+        const focusListener = onFocus$
+          ? () => {
+              void onFocus$();
+            }
+          : undefined;
+        const blurListener = onBlur$
+          ? () => {
+              void onBlur$();
+            }
+          : undefined;
+
+        if (focusListener) {
+          view.dom.addEventListener("focus", focusListener, true);
+        }
+        if (blurListener) {
+          view.dom.addEventListener("blur", blurListener, true);
+        }
+
         // Formatting visibility is handled by the decoration plugin (no DOM selection listeners needed)
 
         requestAnimationFrame(() => {
@@ -352,6 +374,12 @@ export const CodeMirrorEditor = component$(
             void 0;
           }
           editorReady.value = false;
+          if (focusListener) {
+            view.dom.removeEventListener("focus", focusListener, true);
+          }
+          if (blurListener) {
+            view.dom.removeEventListener("blur", blurListener, true);
+          }
           editorViewSignal.value = undefined;
           editorStateSignal.value = undefined;
           themeCompartmentSignal.value = undefined;

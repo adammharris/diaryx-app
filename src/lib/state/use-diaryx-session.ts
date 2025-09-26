@@ -23,6 +23,7 @@ const createInitialState = (): DiaryxSessionState => {
       editorMode: "split",
       showSettings: false,
       libraryMode: "all",
+      editorHasFocus: false,
     },
     importState: {
       isImporting: false,

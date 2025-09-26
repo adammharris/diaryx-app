@@ -19,6 +19,7 @@ export const NoteEditor = component$(() => {
   const metadataToggleRef = useSignal<HTMLButtonElement>();
   const libraryWasOpen = useSignal(session.ui.showLibrary);
   const metadataWasOpen = useSignal(session.ui.showMetadata);
+  const activeNoteDirty = useSignal(false);
 
   useTask$(({ track }) => {
     track(() => session.ui.libraryMode);
@@ -36,6 +37,7 @@ export const NoteEditor = component$(() => {
     const note = collection.find((item) => item.id === activeId);
     markdownSignal.value = note?.body ?? "";
     htmlSignal.value = note ? renderMarkdownToHtml(note.body) : "";
+    activeNoteDirty.value = false;
   });
 
   useTask$(({ track }) => {
@@ -87,6 +89,13 @@ export const NoteEditor = component$(() => {
     { strategy: "document-ready" },
   );
 
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ cleanup }) => {
+    cleanup(() => {
+      session.ui.editorHasFocus = false;
+    });
+  });
+
   const libraryMode = session.ui.libraryMode;
   const isSharedView = libraryMode === "shared";
   const activeId = isSharedView
@@ -119,6 +128,10 @@ export const NoteEditor = component$(() => {
   const showEditorPane = !isSharedView && viewMode.value !== "preview";
   const showPreviewPane =
     isSharedView || viewMode.value === "split" || viewMode.value === "preview";
+
+  if (!showEditorPane && session.ui.editorHasFocus) {
+    session.ui.editorHasFocus = false;
+  }
 
   return (
     <section
@@ -212,7 +225,17 @@ export const NoteEditor = component$(() => {
                   }
                   markdownSignal.value = next;
                   note.body = next;
-                  stampNoteUpdated(note);
+                  activeNoteDirty.value = true;
+                }}
+                onFocus$={() => {
+                  session.ui.editorHasFocus = true;
+                }}
+                onBlur$={() => {
+                  session.ui.editorHasFocus = false;
+                  if (activeNoteDirty.value) {
+                    stampNoteUpdated(note);
+                    activeNoteDirty.value = false;
+                  }
                 }}
               />
             ) : (
@@ -225,7 +248,17 @@ export const NoteEditor = component$(() => {
                   }
                   markdownSignal.value = next;
                   note.body = next;
-                  stampNoteUpdated(note);
+                  activeNoteDirty.value = true;
+                }}
+                onFocus$={() => {
+                  session.ui.editorHasFocus = true;
+                }}
+                onBlur$={() => {
+                  session.ui.editorHasFocus = false;
+                  if (activeNoteDirty.value) {
+                    stampNoteUpdated(note);
+                    activeNoteDirty.value = false;
+                  }
                 }}
               />
             )}

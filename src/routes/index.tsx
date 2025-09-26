@@ -19,6 +19,7 @@ import {
 } from "../lib/persistence/markdown-store";
 import { useDiaryxSessionProvider } from "../lib/state/use-diaryx-session";
 import type { ThemePreference, ColorAccent } from "../lib/state/diaryx-context";
+import type { DiaryxNote } from "../lib/diaryx/types";
 import { syncNotesWithServer } from "../lib/sync/note-sync";
 import { apiFetch } from "../lib/api/http";
 
@@ -66,6 +67,7 @@ export default component$(() => {
   const lastDesktopRightWidth = useSignal(
     session.ui.rightPanelWidth || DEFAULT_RIGHT_PANEL_WIDTH,
   );
+  const pendingAutosave = useSignal(false);
 
   const clampWidths = $(() => {
     const shell = shellRef.value;
@@ -403,6 +405,7 @@ export default component$(() => {
     { strategy: "document-ready" },
   );
 
+  // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(
     async () => {
       if (!hasAuthClient()) return;
@@ -481,42 +484,93 @@ export default component$(() => {
   useTask$(async ({ track }) => {
     track(() => session.notes.length);
     track(() => session.notes.map((note) => note.lastModified));
+    const hasFocus = track(() => session.ui.editorHasFocus);
     if (!notesHydrated.value) return;
+
     if (!session.notes.length) {
       clearMarkdownNotes();
-      session.sharedVisibilityEmails = {};
+      persistNotesToRepositorySync(session.notes);
+      session.sharedVisibilityEmails = computeSharedVisibilityEmails(
+        session.notes,
+      );
+      pendingAutosave.value = false;
       return;
     }
+
+    if (hasFocus) {
+      pendingAutosave.value = true;
+      return;
+    }
+
     persistMarkdownNotes(session.notes);
     const repo = createDiaryxRepository();
     await Promise.all(session.notes.map((note) => repo.save(note)));
+    session.sharedVisibilityEmails = computeSharedVisibilityEmails(
+      session.notes,
+    );
+    pendingAutosave.value = false;
+  });
 
-    const aggregated = new Map<string, Set<string>>();
-    for (const item of session.notes) {
-      const terms = toVisibilityArray(item.metadata.visibility);
-      const emailsMap =
-        (item.metadata.visibility_emails as Record<string, string[]>) ?? {};
-      for (const term of terms) {
-        const normalizedTerm = term.trim();
-        if (!normalizedTerm) continue;
-        const existing = aggregated.get(normalizedTerm) ?? new Set<string>();
-        const emails = emailsMap[normalizedTerm] ?? [];
-        for (const email of emails) {
-          const normalizedEmail = email.trim().toLowerCase();
-          if (normalizedEmail) {
-            existing.add(normalizedEmail);
-          }
-        }
-        aggregated.set(normalizedTerm, existing);
-      }
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ cleanup }) => {
+    if (typeof window === "undefined") {
+      return;
     }
 
-    session.sharedVisibilityEmails = Object.fromEntries(
-      Array.from(aggregated.entries()).map(([term, emails]) => [
-        term,
-        Array.from(emails.values()),
-      ]),
-    );
+    const runSynchronousFlush = () => {
+      if (!notesHydrated.value) return;
+      if (!session.notes.length) {
+        clearMarkdownNotes();
+        persistNotesToRepositorySync(session.notes);
+      } else {
+        persistMarkdownNotes(session.notes);
+        persistNotesToRepositorySync(session.notes);
+      }
+      session.sharedVisibilityEmails = computeSharedVisibilityEmails(
+        session.notes,
+      );
+      pendingAutosave.value = false;
+    };
+
+    const flushIfNeeded = () => {
+      if (!notesHydrated.value) return;
+      if (!pendingAutosave.value && !session.ui.editorHasFocus) return;
+      runSynchronousFlush();
+    };
+
+    const onBeforeUnload = () => {
+      flushIfNeeded();
+    };
+
+    const onPageHide = (event: Event) => {
+      const pageEvent = event as { persisted?: boolean };
+      if (pageEvent?.persisted) {
+        return;
+      }
+      flushIfNeeded();
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState === "hidden") {
+        flushIfNeeded();
+      }
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("pagehide", onPageHide);
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibilityChange);
+    }
+
+    cleanup(() => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("pagehide", onPageHide);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      }
+      flushIfNeeded();
+    });
   });
 
   useTask$(({ track, cleanup }) => {
@@ -741,6 +795,93 @@ export default component$(() => {
     </div>
   );
 });
+
+const computeSharedVisibilityEmails = (notes: DiaryxNote[]) => {
+  if (!notes.length) {
+    return {} as Record<string, string[]>;
+  }
+
+  const aggregated = new Map<string, Set<string>>();
+  for (const item of notes) {
+    const terms = toVisibilityArray(item.metadata.visibility);
+    const emailsMap =
+      (item.metadata.visibility_emails as Record<string, string[]>) ?? {};
+    for (const term of terms) {
+      const normalizedTerm = term.trim();
+      if (!normalizedTerm) continue;
+      const existing = aggregated.get(normalizedTerm) ?? new Set<string>();
+      const emails = emailsMap[normalizedTerm] ?? [];
+      for (const email of emails) {
+        const normalizedEmail = email.trim().toLowerCase();
+        if (normalizedEmail) {
+          existing.add(normalizedEmail);
+        }
+      }
+      aggregated.set(normalizedTerm, existing);
+    }
+  }
+
+  return Object.fromEntries(
+    Array.from(aggregated.entries()).map(([term, emails]) => [
+      term,
+      Array.from(emails.values()),
+    ]),
+  );
+};
+
+const persistNotesToRepositorySync = (notes: DiaryxNote[]) => {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
+    return;
+  }
+
+  const storage = window.localStorage;
+  const indexKey = "diaryx.notes.index";
+  const noteKeyPrefix = "diaryx.note:";
+
+  let previousIds: string[] = [];
+  try {
+    const rawIndex = storage.getItem(indexKey);
+    if (rawIndex) {
+      const parsed = JSON.parse(rawIndex);
+      if (Array.isArray(parsed)) {
+        previousIds = parsed as string[];
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to read note index for synchronous persist", error);
+  }
+
+  const nextIds = notes.map((note) => note.id);
+  const nextIdSet = new Set(nextIds);
+
+  for (const id of previousIds) {
+    if (!nextIdSet.has(id)) {
+      try {
+        storage.removeItem(`${noteKeyPrefix}${id}`);
+      } catch (error) {
+        console.warn(`Failed to remove note ${id} during synchronous persist`, error);
+      }
+    }
+  }
+
+  try {
+    if (nextIds.length) {
+      storage.setItem(indexKey, JSON.stringify(nextIds));
+    } else {
+      storage.removeItem(indexKey);
+    }
+  } catch (error) {
+    console.warn("Failed to persist note index synchronously", error);
+  }
+
+  for (const note of notes) {
+    try {
+      storage.setItem(`${noteKeyPrefix}${note.id}`, JSON.stringify(note));
+    } catch (error) {
+      console.warn(`Failed to persist note ${note.id} synchronously`, error);
+    }
+  }
+};
 
 export const head: DocumentHead = {
   title: "Diaryx Studio",

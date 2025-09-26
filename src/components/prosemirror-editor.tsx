@@ -11,6 +11,8 @@ interface ProseMirrorEditorProps {
   onChange$: PropFunction<(next: string) => void>;
   onViewReady$?: PropFunction<(view: unknown) => void>;
   onDispose$?: PropFunction<() => void>;
+  onFocus$?: PropFunction<() => void>;
+  onBlur$?: PropFunction<() => void>;
   variant?: "default" | "live";
 }
 
@@ -24,6 +26,8 @@ export const ProseMirrorEditor = component$(
     onChange$,
     onViewReady$,
     onDispose$,
+    onFocus$,
+    onBlur$,
     variant = "default",
   }: ProseMirrorEditorProps) => {
     const containerRef = useSignal<HTMLDivElement>();
@@ -108,12 +112,36 @@ export const ProseMirrorEditor = component$(
       viewSignal.value = view;
       editorReady.value = true;
 
+      const focusListener = onFocus$
+        ? () => {
+            void onFocus$();
+          }
+        : undefined;
+      const blurListener = onBlur$
+        ? () => {
+            void onBlur$();
+          }
+        : undefined;
+
+      if (focusListener) {
+        view.dom.addEventListener("focus", focusListener, true);
+      }
+      if (blurListener) {
+        view.dom.addEventListener("blur", blurListener, true);
+      }
+
       // Notify consumer
       if (onViewReady$) await onViewReady$(view);
 
       // Cleanup
       cleanup(async () => {
         try {
+          if (focusListener) {
+            view.dom.removeEventListener("focus", focusListener, true);
+          }
+          if (blurListener) {
+            view.dom.removeEventListener("blur", blurListener, true);
+          }
           view.destroy();
         } catch {
           // ignore issues during teardown
