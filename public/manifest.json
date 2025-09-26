@@ -1,9 +1,16 @@
 {
   "$schema": "https://json.schemastore.org/web-manifest-combined.json",
-  "name": "qwik-project-name",
-  "short_name": "Welcome to Qwik",
+  "name": "Diaryx",
+  "short_name": "Diaryx Studio",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#fff",
-  "description": "A Qwik project app."
+  "description": "A web app for editing Diaryx-formatted files and projects",
+  "icons": [
+     {
+       "src":"android-chrome-512x512.png",
+       "type":"512x512",
+       "sizes":"images/png"
+     }
+  ]
 }
