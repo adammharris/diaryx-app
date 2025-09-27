@@ -1053,9 +1053,16 @@ select {
 }
 
 .note-editor.empty {
+  color: var(--text-secondary);
+}
+
+.note-editor.empty .empty-state {
+  flex: 1;
+  display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-secondary);
+  text-align: center;
+  padding: 2rem;
   font-size: 1rem;
 }
 

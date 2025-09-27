@@ -104,22 +104,64 @@ export const NoteEditor = component$(() => {
   const collection = isSharedView ? session.sharedNotes : session.notes;
   const note = collection.find((item) => item.id === activeId);
 
-  if (!activeId) {
-    return (
-      <section class="note-editor empty">
-        <p>
-          {isSharedView
-            ? "Select a shared note to view."
-            : "Select or create a note to begin."}
-        </p>
-      </section>
-    );
-  }
-
   if (!note) {
+    const emptyMessage = isSharedView
+      ? "Select a shared note to view."
+      : "Select or create a note to begin.";
+
     return (
       <section class="note-editor empty">
-        <p>{isSharedView ? "Shared note not available." : "Note not found."}</p>
+        <header class="editor-toolbar">
+          <div class="editor-summary">
+            <span class="note-title">No note selected</span>
+            <span class="note-updated">
+              {isSharedView ? "Shared library" : "Your library"}
+            </span>
+          </div>
+          <div class="toolbar-groups">
+            <div class="mobile-drawer-toggles">
+              <button
+                type="button"
+                class="mobile-drawer-toggle left"
+                aria-label="Open notes"
+                aria-controls="library-drawer"
+                aria-expanded={session.ui.showLibrary ? "true" : "false"}
+                ref={libraryToggleRef}
+                onClick$={() => {
+                  if (session.ui.showLibrary) {
+                    session.ui.showLibrary = false;
+                    return;
+                  }
+                  session.ui.showLibrary = true;
+                  session.ui.showMetadata = false;
+                }}
+              >
+                Notes
+              </button>
+              <button
+                type="button"
+                class="mobile-drawer-toggle right"
+                aria-label="Open info"
+                aria-controls="metadata-drawer"
+                aria-expanded={session.ui.showMetadata ? "true" : "false"}
+                ref={metadataToggleRef}
+                onClick$={() => {
+                  if (session.ui.showMetadata) {
+                    session.ui.showMetadata = false;
+                    return;
+                  }
+                  session.ui.showMetadata = true;
+                  session.ui.showLibrary = false;
+                }}
+              >
+                Info
+              </button>
+            </div>
+          </div>
+        </header>
+        <div class="empty-state">
+          <p>{emptyMessage}</p>
+        </div>
       </section>
     );
   }
