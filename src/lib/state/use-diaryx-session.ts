@@ -6,7 +6,7 @@ const createInitialState = (): DiaryxSessionState => {
   const initialNote = createWelcomeNote();
   return {
     notes: [initialNote],
-    activeNoteId: initialNote.id,
+    activeNoteId: undefined,
     filters: {
       query: "",
       tag: undefined,

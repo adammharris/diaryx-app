@@ -572,7 +572,6 @@ export default component$(() => {
       }
       if (notes.length) {
         session.notes.splice(0, session.notes.length, ...notes);
-        session.activeNoteId = notes[0]?.id;
       }
       notesHydrated.value = true;
     },
