@@ -109,6 +109,7 @@ export const NoteList = component$(() => {
   const accountSectionOpen = useSignal(false);
   const displaySectionOpen = useSignal(false);
   const noteListRef = useSignal<HTMLElement>();
+  const openMenuId = useSignal<string | undefined>(undefined);
 
   const themeOptions: ReadonlyArray<{
     value: ThemePreference;
@@ -167,6 +168,7 @@ export const NoteList = component$(() => {
       }
       session.ui.expandedNotes = expanded;
     }
+    openMenuId.value = undefined;
   });
 
   const handleCreateNote = $(() => {
@@ -376,6 +378,28 @@ export const NoteList = component$(() => {
     };
 
     persistMarkdownNotes(session.notes);
+  });
+
+  const handleToggleMenu = $((noteId: string, event?: Event) => {
+    event?.stopPropagation();
+    if (session.ui.libraryMode === "shared") {
+      return;
+    }
+    openMenuId.value = openMenuId.value === noteId ? undefined : noteId;
+  });
+
+  const handleMenuAction = $((
+    noteId: string,
+    action: "add-child" | "delete",
+    event?: Event
+  ) => {
+    event?.stopPropagation();
+    openMenuId.value = undefined;
+    if (action === "add-child") {
+      handleCreateChild(noteId);
+    } else {
+      handleDeleteNote(noteId);
+    }
   });
 
   const handleOpenSettings = $(() => {
@@ -588,6 +612,20 @@ export const NoteList = component$(() => {
 
   // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(({ track, cleanup }) => {
+    track(() => openMenuId.value);
+    if (!openMenuId.value) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest('[data-note-actions]')) {
+        openMenuId.value = undefined;
+      }
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    cleanup(() => window.removeEventListener("pointerdown", handlePointerDown));
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track, cleanup }) => {
     track(() => session.ui.showSettings);
     if (!session.ui.showSettings) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -715,7 +753,6 @@ export const NoteList = component$(() => {
         {isSharedView &&
           sharedNotesToDisplay.map((note) => {
             const isActive = session.sharedActiveNoteId === note.id;
-            const preview = note.body.split("\n")[0]?.slice(0, 80) ?? "";
             const author = authorLabel(note.metadata.author);
             return (
               <li key={note.id} class={{ active: isActive }}>
@@ -728,7 +765,6 @@ export const NoteList = component$(() => {
                     {note.metadata.title}
                     {author && <span class="shared-author"> — {author}</span>}
                   </span>
-                  <span class="preview">{preview}</span>
                 </button>
               </li>
             );
@@ -737,7 +773,6 @@ export const NoteList = component$(() => {
           treeDisplayItems.map((item) => {
             const note = item.note;
             const isActive = session.activeNoteId === note.id;
-            const preview = note.body.split("\n")[0]?.slice(0, 80) ?? "";
             const indent = Math.max(item.depth, 0) * 16;
             return (
               <li
@@ -748,6 +783,12 @@ export const NoteList = component$(() => {
                 <div
                   class="note-row"
                   style={{ paddingInlineStart: `${indent}px` }}
+                  data-note-actions={openMenuId.value === note.id ? "open" : undefined}
+                  onPointerLeave$={() => {
+                    if (openMenuId.value === note.id) {
+                      openMenuId.value = undefined;
+                    }
+                  }}
                 >
                   {item.hasChildren ? (
                     <button
@@ -757,36 +798,52 @@ export const NoteList = component$(() => {
                       aria-label={`${item.isExpanded ? "Collapse" : "Expand"} ${note.metadata.title || "note"}`}
                       onClick$={(event) => handleToggleExpand(note.id, event)}
                     />
-                  ) : (
-                    <span class="note-toggle placeholder" aria-hidden="true" />
-                  )}
+                  ) : null}
                   <button
                     type="button"
                     class="note-open"
                     onClick$={() => handleSelect(note.id)}
                   >
                     <span class="title">{note.metadata.title}</span>
-                    <span class="preview">{preview}</span>
                   </button>
-                  <div class="note-row-actions">
+                  <div class="note-row-actions" data-note-actions>
                     <button
                       type="button"
-                      class="note-add-child"
-                      aria-label="Add child note"
-                      title="Add child note"
-                      onClick$={(event) => handleCreateChild(note.id, event)}
+                      class="note-menu-trigger"
+                      aria-haspopup="menu"
+                      aria-expanded={openMenuId.value === note.id ? "true" : "false"}
+                      aria-label="Note actions"
+                      onClick$={(event) => handleToggleMenu(note.id, event)}
                     >
-                      +
+                      ⋯
                     </button>
-                    <button
-                      type="button"
-                      class="note-delete"
-                      aria-label="Delete note"
-                      title="Delete note"
-                      onClick$={(event) => handleDeleteNote(note.id, event)}
-                    >
-                      ×
-                    </button>
+                    {openMenuId.value === note.id && (
+                      <div
+                        class="note-menu"
+                        role="menu"
+                        onPointerLeave$={() => {
+                          if (openMenuId.value === note.id) {
+                            openMenuId.value = undefined;
+                          }
+                        }}
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick$={(event) => handleMenuAction(note.id, "add-child", event)}
+                        >
+                          Add child note
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          class="danger"
+                          onClick$={(event) => handleMenuAction(note.id, "delete", event)}
+                        >
+                          Delete note
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </li>

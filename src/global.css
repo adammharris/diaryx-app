@@ -886,30 +886,24 @@ input[type="radio"] {
   box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
-.note-list .note-toggle.placeholder {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-}
-
 .note-list .note-row-actions {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.2rem;
   flex-shrink: 0;
 }
 
-.note-list li .note-add-child {
+.note-list .note-menu-trigger {
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
+  font-size: 1.25rem;
   cursor: pointer;
   transition:
     background 150ms ease,
@@ -917,17 +911,61 @@ input[type="radio"] {
     transform 150ms ease;
 }
 
-.note-list li .note-add-child:hover {
+.note-list .note-menu-trigger:hover {
   background: var(--accent-soft);
   color: var(--accent-primary);
   transform: translateY(-1px);
 }
 
-.note-list li .note-add-child:focus-visible {
+.note-list .note-menu-trigger:focus-visible {
   outline: none;
   background: var(--accent-surface);
   color: var(--accent-primary);
   box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.note-list .note-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  min-width: 160px;
+  padding: 0.35rem;
+  border-radius: 12px;
+  background: var(--surface-base);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  z-index: 20;
+}
+
+.note-list .note-menu button {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.note-list .note-menu button:hover,
+.note-list .note-menu button:focus-visible {
+  outline: none;
+  background: var(--accent-soft);
+  color: var(--accent-primary);
+}
+
+.note-list .note-menu button.danger {
+  color: #dc2626;
+}
+
+.note-list .note-menu button.danger:hover,
+.note-list .note-menu button.danger:focus-visible {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
 }
 
 .note-list .note-items .note-empty {
@@ -952,14 +990,14 @@ input[type="radio"] {
   min-width: 0;
   border: none;
   background: transparent;
-  padding: 0.9rem 1rem;
-  border-radius: 18px;
+  padding: 0.55rem 0.75rem;
+  border-radius: 14px;
   text-align: left;
   cursor: pointer;
   color: inherit;
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.4rem;
   transition:
     background 160ms ease,
     transform 200ms ease,
@@ -983,40 +1021,8 @@ input[type="radio"] {
   box-shadow: inset 0 0 0 2px var(--accent-ring);
 }
 
-.note-list li .note-delete {
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.1rem;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition:
-    background 150ms ease,
-    color 150ms ease,
-    transform 150ms ease;
-}
-
-.note-list li .note-delete:hover {
-  background: rgba(220, 38, 38, 0.12);
-  color: #dc2626;
-  transform: translateY(-1px);
-}
-
-.note-list li .note-delete:focus-visible {
-  outline: none;
-  background: rgba(220, 38, 38, 0.18);
-  color: #dc2626;
-  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.35);
-}
-
 .note-list .title {
-  font-size: 1rem;
+  font-size: 0.96rem;
   letter-spacing: -0.01em;
 }
 
@@ -1024,14 +1030,6 @@ input[type="radio"] {
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-secondary);
-}
-
-.note-list .preview {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .note-editor {
