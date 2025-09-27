@@ -69,6 +69,42 @@ export default component$(() => {
   );
   const pendingAutosave = useSignal(false);
 
+  useTask$(({ cleanup }) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const preventWheelZoom = (event: WheelEvent) => {
+      if (event.ctrlKey) {
+        event.preventDefault();
+      }
+    };
+
+    const preventMultiTouch = (event: TouchEvent) => {
+      if (event.touches.length > 1) {
+        event.preventDefault();
+      }
+    };
+
+    const preventGesture = (event: Event) => {
+      event.preventDefault();
+    };
+
+    window.addEventListener("wheel", preventWheelZoom, { passive: false });
+    window.addEventListener("touchmove", preventMultiTouch, { passive: false });
+    window.addEventListener("gesturestart", preventGesture, { passive: false });
+    window.addEventListener("gesturechange", preventGesture, { passive: false });
+    window.addEventListener("gestureend", preventGesture, { passive: false });
+
+    cleanup(() => {
+      window.removeEventListener("wheel", preventWheelZoom);
+      window.removeEventListener("touchmove", preventMultiTouch);
+      window.removeEventListener("gesturestart", preventGesture);
+      window.removeEventListener("gesturechange", preventGesture);
+      window.removeEventListener("gestureend", preventGesture);
+    });
+  });
+
   const clampWidths = $(() => {
     const shell = shellRef.value;
     if (!shell) return;
