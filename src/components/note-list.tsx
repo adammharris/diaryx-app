@@ -303,39 +303,15 @@ export const NoteList = component$(() => {
     }
 
     const expandedEntries = session.ui.expandedNotes ?? {};
-    const isExpanded = Boolean(expandedEntries[noteId]);
     const nextExpanded = { ...expandedEntries };
+    const tree = buildDiaryxNoteTree(session.notes);
+    const node = tree.nodesById.get(noteId);
+    const defaultExpanded = node?.note.metadata.this_file_is_root_index === true;
+    const explicitState = expandedEntries[noteId];
+    const isExpanded =
+      explicitState !== undefined ? explicitState : Boolean(defaultExpanded);
 
-    if (isExpanded) {
-      delete nextExpanded[noteId];
-    } else {
-      nextExpanded[noteId] = true;
-    }
-
-    if (isExpanded) {
-      const tree = buildDiaryxNoteTree(session.notes);
-      const node = tree.nodesById.get(noteId);
-      if (node) {
-        const descendants = new Set<string>();
-        const stack: DiaryxNoteTreeNode[] = [...node.children];
-        while (stack.length) {
-          const currentNode = stack.pop();
-          if (!currentNode) continue;
-          if (descendants.has(currentNode.note.id)) {
-            continue;
-          }
-          descendants.add(currentNode.note.id);
-          if (currentNode.children.length) {
-            stack.push(...currentNode.children);
-          }
-        }
-        const activeId = session.activeNoteId;
-        if (activeId && activeId !== noteId && descendants.has(activeId)) {
-          session.activeNoteId = noteId;
-        }
-      }
-    }
-
+    nextExpanded[noteId] = !isExpanded;
     session.ui.expandedNotes = nextExpanded;
   });
 
@@ -483,9 +459,14 @@ export const NoteList = component$(() => {
   if (!isSharedView) {
     const tree = buildDiaryxNoteTree(activeCollection);
     const expandedEntries = session.ui.expandedNotes ?? {};
-    const expandedSet = new Set(
+    const expandedTrue = new Set(
       Object.entries(expandedEntries)
-        .filter(([, value]) => Boolean(value))
+        .filter(([, value]) => value === true)
+        .map(([key]) => key)
+    );
+    const collapsedExplicit = new Set(
+      Object.entries(expandedEntries)
+        .filter(([, value]) => value === false)
         .map(([key]) => key)
     );
 
@@ -521,12 +502,16 @@ export const NoteList = component$(() => {
         hasMatchingChild ||
         isActive ||
         ancestorsOfActive.has(node.note.id);
-      const isExpanded =
-        isSearching ||
-        expandedSet.has(node.note.id) ||
-        ancestorsOfActive.has(node.note.id) ||
-        isActive ||
-        node.note.metadata.this_file_is_root_index === true;
+      const explicitState = expandedEntries[node.note.id];
+      const searchExpanded = isSearching && (matchesSearch || hasMatchingChild);
+      const defaultExpanded =
+        node.note.metadata.this_file_is_root_index === true &&
+        !collapsedExplicit.has(node.note.id);
+      const effectiveExpanded =
+        explicitState !== undefined
+          ? explicitState
+          : defaultExpanded || expandedTrue.has(node.note.id);
+      const isExpanded = effectiveExpanded || searchExpanded;
 
       const items: NoteListDisplayItem[] = [];
       if (shouldInclude) {
@@ -538,7 +523,10 @@ export const NoteList = component$(() => {
           matchesSearch,
           descendantMatches: hasMatchingChild,
         });
-        if ((isSearching || isExpanded) && node.children.length) {
+        if (
+          node.children.length &&
+          (isExpanded || (isSearching && (matchesSearch || hasMatchingChild)))
+        ) {
           for (const result of childResults) {
             if (result.items.length) {
               items.push(...result.items);
@@ -578,14 +566,14 @@ export const NoteList = component$(() => {
       const node = tree.nodesById.get(note.id);
       const hasChildren = Boolean(node?.children.length);
       const matchesSearch = isSearching ? noteMatchesQuery(note) : false;
-      const isActive = note.id === activeNoteId;
+      const explicitState = expandedEntries[note.id];
+      const defaultExpanded =
+        hasChildren &&
+        note.metadata.this_file_is_root_index === true &&
+        !collapsedExplicit.has(note.id);
       const isExpanded =
-        isSearching ||
-        (hasChildren &&
-          (expandedSet.has(note.id) ||
-            ancestorsOfActive.has(note.id) ||
-            isActive ||
-            note.metadata.this_file_is_root_index === true));
+        (explicitState !== undefined ? explicitState : defaultExpanded) ||
+        (isSearching && (matchesSearch || Boolean(node && node.children.length)));
 
       treeDisplayItems.push({
         note,

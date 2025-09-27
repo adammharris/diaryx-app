@@ -849,8 +849,8 @@ input[type="radio"] {
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -865,7 +865,7 @@ input[type="radio"] {
 
 .note-list .note-toggle::before {
   content: "\25B8";
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   transition: transform 160ms ease;
 }
 
@@ -887,8 +887,8 @@ input[type="radio"] {
 }
 
 .note-list .note-toggle.placeholder {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
 }
 
