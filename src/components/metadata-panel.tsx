@@ -7,7 +7,7 @@ import {
 } from "@builder.io/qwik";
 import type { Signal } from "@builder.io/qwik";
 import yaml from "js-yaml";
-import { stampNoteUpdated } from "../lib/diaryx/note-utils";
+import { stampNoteUpdated, syncNoteFrontmatter } from "../lib/diaryx/note-utils";
 import {
   describeIssues,
   missingMetadataFields,
@@ -16,6 +16,13 @@ import {
 } from "../lib/diaryx/metadata-utils";
 import { useDiaryxSession } from "../lib/state/use-diaryx-session";
 import type { DiaryxNote } from "../lib/diaryx/types";
+import type { DiaryxSessionState } from "../lib/state/diaryx-context";
+import {
+  createDiaryxLinkResolver,
+  formatDiaryxLink,
+  normalizeMetadataList,
+  parseDiaryxLink,
+} from "../lib/diaryx/note-tree";
 
 const isEmptyMetadataValue = (value: unknown): boolean => {
   if (value === undefined || value === null) return true;
@@ -150,7 +157,132 @@ const emailsMatch = (a: string[], b: string[]): boolean => {
   return normalizedA.every((email) => normalizedB.includes(email));
 };
 
+const normalizeLabelKey = (value: string | undefined): string | undefined => {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length ? normalized : undefined;
+};
+
+const rewriteLinkCollection = (
+  source: string | string[] | undefined,
+  resolver: ReturnType<typeof createDiaryxLinkResolver>,
+  noteId: string,
+  updatedTitle: string,
+  previousTitleKey?: string
+): { changed: boolean; value: string | string[] | undefined } => {
+  if (!source) {
+    return { changed: false, value: source };
+  }
+
+  const entries = normalizeMetadataList(source);
+  if (!entries.length) {
+    return { changed: false, value: source };
+  }
+
+  const cleanedTitle = updatedTitle.trim();
+  let changed = false;
+  const updatedEntries = entries.map((entry) => {
+    const link = parseDiaryxLink(entry);
+    const resolvedId = resolver(link);
+    const matchesResolver = resolvedId === noteId;
+    const matchesPreviousLabel =
+      !matchesResolver && previousTitleKey
+        ? normalizeLabelKey(link.label) === previousTitleKey
+        : false;
+
+    if (!matchesResolver && !matchesPreviousLabel) {
+      return entry;
+    }
+
+    const labelCandidate = cleanedTitle.length
+      ? cleanedTitle
+      : link.label?.trim().length
+        ? link.label.trim()
+        : link.target;
+    const formatted = formatDiaryxLink(labelCandidate, link.target);
+    if (formatted !== entry) {
+      changed = true;
+      return formatted;
+    }
+    if (matchesPreviousLabel && cleanedTitle.length && link.label.trim() !== cleanedTitle) {
+      changed = true;
+      return formatDiaryxLink(cleanedTitle, link.target);
+    }
+    return entry;
+  });
+
+  if (!changed) {
+    return { changed: false, value: source };
+  }
+
+  if (!updatedEntries.length) {
+    return { changed: true, value: undefined };
+  }
+
+  if (Array.isArray(source) || updatedEntries.length > 1) {
+    return { changed: true, value: updatedEntries };
+  }
+
+  return { changed: true, value: updatedEntries[0] };
+};
+
+const updateTitleReferences = (
+  session: DiaryxSessionState,
+  note: DiaryxNote,
+  previousTitle?: string
+) => {
+  const updatedTitle = String(note.metadata.title ?? "");
+  const previousTitleKey = normalizeLabelKey(previousTitle);
+  const resolver = createDiaryxLinkResolver(session.notes);
+
+  for (const candidate of session.notes) {
+    if (candidate.id === note.id) continue;
+
+    const contentsResult = rewriteLinkCollection(
+      candidate.metadata.contents as string | string[] | undefined,
+      resolver,
+      note.id,
+      updatedTitle,
+      previousTitleKey
+    );
+
+    const partOfResult = rewriteLinkCollection(
+      candidate.metadata.part_of as string | string[] | undefined,
+      resolver,
+      note.id,
+      updatedTitle,
+      previousTitleKey
+    );
+
+    if (!contentsResult.changed && !partOfResult.changed) {
+      continue;
+    }
+
+    if (contentsResult.changed) {
+      const nextValue = contentsResult.value;
+      if (!nextValue || (Array.isArray(nextValue) && !nextValue.length)) {
+        delete (candidate.metadata as Record<string, unknown>).contents;
+      } else {
+        candidate.metadata.contents = nextValue as string | string[];
+      }
+    }
+
+    if (partOfResult.changed) {
+      const nextValue = partOfResult.value;
+      if (!nextValue || (Array.isArray(nextValue) && !nextValue.length)) {
+        delete (candidate.metadata as Record<string, unknown>).part_of;
+      } else {
+        candidate.metadata.part_of = nextValue as string | string[];
+      }
+    }
+
+    stampNoteUpdated(candidate);
+    syncNoteFrontmatter(candidate);
+  }
+};
+
 const setMetadataField = (
+  session: DiaryxSessionState,
   note: DiaryxNote,
   key: keyof DiaryxNote["metadata"],
   value: unknown,
@@ -158,6 +290,9 @@ const setMetadataField = (
   skipMetadataTimestamp = false,
 ) => {
   const target = note.metadata as Record<string, unknown>;
+  const previousTitle =
+    key === "title" ? String(note.metadata.title ?? "") : undefined;
+
   if (value === undefined || (Array.isArray(value) && value.length === 0)) {
     delete target[key as string];
   } else {
@@ -165,9 +300,14 @@ const setMetadataField = (
   }
   stampNoteUpdated(note, { skipMetadata: skipMetadataTimestamp });
   syncFrontmatter(note, rawYaml);
+
+  if (key === "title") {
+    updateTitleReferences(session, note, previousTitle);
+  }
 };
 
 const applyRawYaml = (
+  session: DiaryxSessionState,
   note: DiaryxNote,
   value: string,
   rawYaml: Signal<string>,
@@ -175,6 +315,7 @@ const applyRawYaml = (
 ) => {
   rawYaml.value = value;
   try {
+    const previousTitle = String(note.metadata.title ?? "");
     const parsed = yaml.load(value) ?? {};
     if (parsed && typeof parsed !== "object") {
       yamlError.value = "YAML must describe an object";
@@ -192,6 +333,10 @@ const applyRawYaml = (
     } else {
       note.frontmatter = undefined;
       syncFrontmatter(note, rawYaml);
+    }
+    const nextTitle = String(note.metadata.title ?? "");
+    if (previousTitle !== nextTitle) {
+      updateTitleReferences(session, note, previousTitle);
     }
   } catch (error) {
     yamlError.value = error instanceof Error ? error.message : "Invalid YAML";
@@ -283,9 +428,9 @@ export const MetadataPanel = component$(() => {
       delete current[normalizedTerm];
     }
     if (Object.keys(current).length === 0) {
-      setMetadataField(note, "visibility_emails", undefined, rawYaml, true);
+      setMetadataField(session, note, "visibility_emails", undefined, rawYaml, true);
     } else {
-      setMetadataField(note, "visibility_emails", current, rawYaml, true);
+      setMetadataField(session, note, "visibility_emails", current, rawYaml, true);
     }
 
     const aggregated = new Map<string, Set<string>>();
@@ -609,6 +754,7 @@ export const MetadataPanel = component$(() => {
               value={note.metadata.title}
               onInput$={(event) =>
                 setMetadataField(
+                  session,
                   note,
                   "title",
                   (event.target as HTMLInputElement).value,
@@ -635,6 +781,7 @@ export const MetadataPanel = component$(() => {
               value={toList(note.metadata.author)}
               onInput$={(event) =>
                 setMetadataField(
+                  session,
                   note,
                   "author",
                   toValue((event.target as HTMLTextAreaElement).value),
@@ -665,7 +812,7 @@ export const MetadataPanel = component$(() => {
                 onInput$={(event) => {
                   const target = event.target as HTMLInputElement;
                   const iso = fromDateTimeInputValue(target.value);
-                  setMetadataField(note, "created", iso, rawYaml, true);
+                  setMetadataField(session, note, "created", iso, rawYaml, true);
                 }}
               />
             </div>
@@ -692,7 +839,7 @@ export const MetadataPanel = component$(() => {
                 onInput$={(event) => {
                   const target = event.target as HTMLInputElement;
                   const iso = fromDateTimeInputValue(target.value);
-                  setMetadataField(note, "updated", iso, rawYaml, true);
+                  setMetadataField(session, note, "updated", iso, rawYaml, true);
                 }}
               />
               <label class={{ "auto-update-toggle": true, active: autoUpdate }}>
@@ -766,16 +913,17 @@ export const MetadataPanel = component$(() => {
                   new Set(values.map((term) => term.trim()).filter(Boolean)),
                 );
                 if (!unique.length) {
-                  setMetadataField(note, "visibility", "", rawYaml);
+                  setMetadataField(session, note, "visibility", "", rawYaml);
                 } else if (unique.length === 1) {
                   setMetadataField(
+                    session,
                     note,
                     "visibility",
                     unique.at(0) ?? "",
                     rawYaml,
                   );
                 } else {
-                  setMetadataField(note, "visibility", unique, rawYaml);
+                  setMetadataField(session, note, "visibility", unique, rawYaml);
                 }
 
                 const emails = note.metadata.visibility_emails
@@ -797,6 +945,7 @@ export const MetadataPanel = component$(() => {
                   if (changed) {
                     if (Object.keys(emails).length === 0) {
                       setMetadataField(
+                        session,
                         note,
                         "visibility_emails",
                         undefined,
@@ -805,6 +954,7 @@ export const MetadataPanel = component$(() => {
                       );
                     } else {
                       setMetadataField(
+                        session,
                         note,
                         "visibility_emails",
                         emails,
@@ -1135,6 +1285,7 @@ export const MetadataPanel = component$(() => {
               value={toList(note.metadata.format)}
               onInput$={(event) =>
                 setMetadataField(
+                  session,
                   note,
                   "format",
                   toValue((event.target as HTMLTextAreaElement).value),
@@ -1161,6 +1312,7 @@ export const MetadataPanel = component$(() => {
               value={toList(note.metadata.reachable)}
               onInput$={(event) =>
                 setMetadataField(
+                  session,
                   note,
                   "reachable",
                   toValue((event.target as HTMLTextAreaElement).value),
@@ -1177,6 +1329,7 @@ export const MetadataPanel = component$(() => {
               onInput$={(event) => {
                 const value = (event.target as HTMLInputElement).value;
                 setMetadataField(
+                  session,
                   note,
                   "tags",
                   value
@@ -1196,6 +1349,7 @@ export const MetadataPanel = component$(() => {
               onInput$={(event) => {
                 const value = (event.target as HTMLInputElement).value;
                 setMetadataField(
+                  session,
                   note,
                   "aliases",
                   value
@@ -1213,6 +1367,7 @@ export const MetadataPanel = component$(() => {
               checked={note.metadata.this_file_is_root_index === true}
               onInput$={(event) =>
                 setMetadataField(
+                  session,
                   note,
                   "this_file_is_root_index",
                   (event.target as HTMLInputElement).checked,
@@ -1228,6 +1383,7 @@ export const MetadataPanel = component$(() => {
               checked={note.metadata.starred === true}
               onInput$={(event) =>
                 setMetadataField(
+                  session,
                   note,
                   "starred",
                   (event.target as HTMLInputElement).checked,
@@ -1243,6 +1399,7 @@ export const MetadataPanel = component$(() => {
               checked={note.metadata.pinned === true}
               onInput$={(event) =>
                 setMetadataField(
+                  session,
                   note,
                   "pinned",
                   (event.target as HTMLInputElement).checked,
@@ -1275,6 +1432,7 @@ export const MetadataPanel = component$(() => {
             value={rawYaml.value}
             onInput$={(event) =>
               applyRawYaml(
+                session,
                 note,
                 (event.target as HTMLTextAreaElement).value,
                 rawYaml,

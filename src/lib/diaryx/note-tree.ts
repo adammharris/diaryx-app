@@ -19,6 +19,8 @@ export interface DiaryxNoteTree {
   parentById: Map<string, string>;
 }
 
+export type DiaryxLinkResolver = (link: DiaryxContentLink) => string | undefined;
+
 const LINK_PATTERN = /^\s*\[([^\]]*)\]\((.+)\)\s*$/;
 
 const normalizeKey = (value: string): string => value.trim().toLowerCase();
@@ -139,28 +141,13 @@ const matchLinkToNote = (
   return undefined;
 };
 
-export const buildDiaryxNoteTree = (notes: DiaryxNote[]): DiaryxNoteTree => {
-  const nodesById = new Map<string, DiaryxNoteTreeNode>();
-  const parentById = new Map<string, string>();
-  const pendingChildren = new Map<string, string[]>();
-  const contentOrder = new Map<string, number>();
+const buildLinkIndices = (
+  notes: DiaryxNote[]
+): { hrefIndex: Map<string, string>; titleIndex: Map<string, string> } => {
   const hrefIndex = new Map<string, string>();
   const titleIndex = new Map<string, string>();
-  const orderIndex = new Map<string, number>();
 
-  notes.forEach((note, index) => {
-    orderIndex.set(note.id, index);
-    const contentStrings = normalizeMetadataList(note.metadata.contents as
-      | string
-      | string[]
-      | undefined);
-    const contentLinks = contentStrings.map(parseDiaryxLink);
-    nodesById.set(note.id, {
-      note,
-      children: [],
-      contentLinks,
-    });
-
+  for (const note of notes) {
     const sourceName = note.sourceName?.trim();
     if (sourceName) {
       for (const variant of normalizeTargetVariants(sourceName)) {
@@ -187,12 +174,45 @@ export const buildDiaryxNoteTree = (notes: DiaryxNote[]): DiaryxNoteTree => {
         titleIndex.set(normalized, note.id);
       }
     }
+  }
+
+  return { hrefIndex, titleIndex };
+};
+
+export const createDiaryxLinkResolver = (notes: DiaryxNote[]): DiaryxLinkResolver => {
+  const { hrefIndex, titleIndex } = buildLinkIndices(notes);
+  return (link: DiaryxContentLink) => matchLinkToNote(link, hrefIndex, titleIndex);
+};
+
+export const buildDiaryxNoteTree = (notes: DiaryxNote[]): DiaryxNoteTree => {
+  const nodesById = new Map<string, DiaryxNoteTreeNode>();
+  const parentById = new Map<string, string>();
+  const pendingChildren = new Map<string, string[]>();
+  const contentOrder = new Map<string, number>();
+  const orderIndex = new Map<string, number>();
+
+  const indexMaps = buildLinkIndices(notes);
+  const resolverHrefIndex = indexMaps.hrefIndex;
+  const resolverTitleIndex = indexMaps.titleIndex;
+
+  notes.forEach((note, index) => {
+    orderIndex.set(note.id, index);
+    const contentStrings = normalizeMetadataList(note.metadata.contents as
+      | string
+      | string[]
+      | undefined);
+    const contentLinks = contentStrings.map(parseDiaryxLink);
+    nodesById.set(note.id, {
+      note,
+      children: [],
+      contentLinks,
+    });
   });
 
   for (const node of nodesById.values()) {
     if (!node.contentLinks.length) continue;
     node.contentLinks.forEach((link, index) => {
-      const childId = matchLinkToNote(link, hrefIndex, titleIndex);
+      const childId = matchLinkToNote(link, resolverHrefIndex, resolverTitleIndex);
       if (!childId || childId === node.note.id) {
         return;
       }
@@ -224,7 +244,11 @@ export const buildDiaryxNoteTree = (notes: DiaryxNote[]): DiaryxNoteTree => {
       | undefined);
     for (const raw of partOfList) {
       const parentLink = parseDiaryxLink(raw);
-      const matchedParent = matchLinkToNote(parentLink, hrefIndex, titleIndex);
+      const matchedParent = matchLinkToNote(
+        parentLink,
+        resolverHrefIndex,
+        resolverTitleIndex
+      );
       if (matchedParent && matchedParent !== node.note.id) {
         parentById.set(node.note.id, matchedParent);
         break;

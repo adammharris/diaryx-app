@@ -572,14 +572,28 @@ export const NoteList = component$(() => {
       if (treeDisplayItems.some((item) => item.note.id === note.id)) {
         continue;
       }
+      if (tree.parentById.has(note.id)) {
+        continue;
+      }
+      const node = tree.nodesById.get(note.id);
+      const hasChildren = Boolean(node?.children.length);
       const matchesSearch = isSearching ? noteMatchesQuery(note) : false;
+      const isActive = note.id === activeNoteId;
+      const isExpanded =
+        isSearching ||
+        (hasChildren &&
+          (expandedSet.has(note.id) ||
+            ancestorsOfActive.has(note.id) ||
+            isActive ||
+            note.metadata.this_file_is_root_index === true));
+
       treeDisplayItems.push({
         note,
         depth: 0,
-        hasChildren: false,
-        isExpanded: false,
+        hasChildren,
+        isExpanded,
         matchesSearch,
-        descendantMatches: false,
+        descendantMatches: Boolean(node && node.children.length > 0),
       });
     }
   }
