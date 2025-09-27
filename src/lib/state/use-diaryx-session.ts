@@ -20,7 +20,7 @@ const createInitialState = (): DiaryxSessionState => {
       showMetadata: false,
       showPreview: true,
       showCommandPalette: false,
-      editorMode: "split",
+      editorMode: "live",
       showSettings: false,
       libraryMode: "all",
       editorHasFocus: false,
