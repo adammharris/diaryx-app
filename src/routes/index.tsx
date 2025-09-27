@@ -114,25 +114,89 @@ export default component$(() => {
 
     const state: {
       pointerId: number | null;
-      origin:
-        | "left-open"
-        | "left-close"
-        | "right-open"
-        | "right-close"
-        | null;
       startX: number;
       startY: number;
+      action: "open-library" | "close-library" | "open-metadata" | "close-metadata" | null;
       handled: boolean;
     } = {
       pointerId: null,
-      origin: null,
       startX: 0,
       startY: 0,
+      action: null,
       handled: false,
     };
 
-    const EDGE_THRESHOLD = 40;
-    const DRAG_THRESHOLD = 36;
+    const DRAG_THRESHOLD = 32;
+
+    const executeAction = (action: typeof state.action) => {
+      switch (action) {
+        case "open-library":
+          session.ui.showLibrary = true;
+          session.ui.showMetadata = false;
+          state.handled = true;
+          break;
+        case "close-library":
+          session.ui.showLibrary = false;
+          state.handled = true;
+          break;
+        case "open-metadata":
+          session.ui.showMetadata = true;
+          session.ui.showLibrary = false;
+          state.handled = true;
+          break;
+        case "close-metadata":
+          session.ui.showMetadata = false;
+          state.handled = true;
+          break;
+        default:
+          break;
+      }
+    };
+
+    const resolveAction = (direction: "left" | "right"): typeof state.action => {
+      if (direction === "right") {
+        if (session.ui.showMetadata) return "close-metadata";
+        if (!session.ui.showLibrary) return "open-library";
+        return null;
+      }
+      // direction === "left"
+      if (session.ui.showLibrary) return "close-library";
+      if (!session.ui.showMetadata) return "open-metadata";
+      return null;
+    };
+
+    const resetState = () => {
+      state.pointerId = null;
+      state.action = null;
+      state.handled = false;
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (state.pointerId === null || event.pointerId !== state.pointerId) {
+        return;
+      }
+
+      const deltaX = event.clientX - state.startX;
+      const deltaY = event.clientY - state.startY;
+
+      if (!state.handled) {
+        if (Math.abs(deltaX) < DRAG_THRESHOLD || Math.abs(deltaX) <= Math.abs(deltaY)) {
+          return;
+        }
+
+        if (!state.action) {
+          state.action = resolveAction(deltaX > 0 ? "right" : "left");
+        }
+
+        if (state.action) {
+          executeAction(state.action);
+        }
+      }
+
+      if (state.handled) {
+        event.preventDefault();
+      }
+    };
 
     const handlePointerUp = (event: PointerEvent) => {
       if (state.pointerId === null || event.pointerId !== state.pointerId) {
@@ -143,68 +207,7 @@ export default component$(() => {
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerUp);
       shell.releasePointerCapture?.(state.pointerId);
-
-      if (!state.handled) {
-        const deltaX = event.clientX - state.startX;
-        const deltaY = event.clientY - state.startY;
-        if (Math.abs(deltaX) >= DRAG_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
-          applySwipe(deltaX);
-        }
-      }
-
-      state.pointerId = null;
-      state.origin = null;
-      state.handled = false;
-    };
-
-    const applySwipe = (deltaX: number) => {
-      switch (state.origin) {
-        case "left-open":
-          if (deltaX > DRAG_THRESHOLD) {
-            session.ui.showLibrary = true;
-            session.ui.showMetadata = false;
-            state.handled = true;
-          }
-          break;
-        case "left-close":
-          if (deltaX < -DRAG_THRESHOLD) {
-            session.ui.showLibrary = false;
-            state.handled = true;
-          }
-          break;
-        case "right-open":
-          if (deltaX < -DRAG_THRESHOLD) {
-            session.ui.showMetadata = true;
-            session.ui.showLibrary = false;
-            state.handled = true;
-          }
-          break;
-        case "right-close":
-          if (deltaX > DRAG_THRESHOLD) {
-            session.ui.showMetadata = false;
-            state.handled = true;
-          }
-          break;
-        default:
-          break;
-      }
-    };
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (state.pointerId === null || event.pointerId !== state.pointerId) {
-        return;
-      }
-      const deltaX = event.clientX - state.startX;
-      const deltaY = event.clientY - state.startY;
-      if (!state.handled) {
-        if (Math.abs(deltaX) < DRAG_THRESHOLD || Math.abs(deltaX) <= Math.abs(deltaY)) {
-          return;
-        }
-        applySwipe(deltaX);
-      }
-      if (state.handled) {
-        event.preventDefault();
-      }
+      resetState();
     };
 
     const handlePointerDown = (event: PointerEvent) => {
@@ -218,39 +221,10 @@ export default component$(() => {
         return;
       }
 
-      const rect = shell.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const fromLeft = x;
-      const fromRight = rect.width - x;
-
-      let origin: (typeof state.origin) | null = null;
-
-      if (!session.ui.showLibrary && fromLeft <= EDGE_THRESHOLD) {
-        origin = "left-open";
-      } else if (
-        session.ui.showLibrary &&
-        session.ui.leftPanelWidth > 0 &&
-        session.ui.leftPanelWidth - fromLeft <= EDGE_THRESHOLD &&
-        session.ui.leftPanelWidth - fromLeft >= -EDGE_THRESHOLD
-      ) {
-        origin = "left-close";
-      } else if (!session.ui.showMetadata && fromRight <= EDGE_THRESHOLD) {
-        origin = "right-open";
-      } else if (
-        session.ui.showMetadata &&
-        session.ui.rightPanelWidth > 0 &&
-        session.ui.rightPanelWidth - fromRight <= EDGE_THRESHOLD &&
-        session.ui.rightPanelWidth - fromRight >= -EDGE_THRESHOLD
-      ) {
-        origin = "right-close";
-      } else {
-        return;
-      }
-
       state.pointerId = event.pointerId;
-      state.origin = origin;
       state.startX = event.clientX;
       state.startY = event.clientY;
+      state.action = null;
       state.handled = false;
 
       shell.setPointerCapture?.(event.pointerId);
