@@ -105,6 +105,170 @@ export default component$(() => {
     });
   });
 
+  useTask$(({ track, cleanup }) => {
+    track(() => shellRef.value);
+    const shell = shellRef.value;
+    if (!shell) {
+      return;
+    }
+
+    const state: {
+      pointerId: number | null;
+      origin:
+        | "left-open"
+        | "left-close"
+        | "right-open"
+        | "right-close"
+        | null;
+      startX: number;
+      startY: number;
+      handled: boolean;
+    } = {
+      pointerId: null,
+      origin: null,
+      startX: 0,
+      startY: 0,
+      handled: false,
+    };
+
+    const EDGE_THRESHOLD = 40;
+    const DRAG_THRESHOLD = 36;
+
+    const handlePointerUp = (event: PointerEvent) => {
+      if (state.pointerId === null || event.pointerId !== state.pointerId) {
+        return;
+      }
+
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      shell.releasePointerCapture?.(state.pointerId);
+
+      if (!state.handled) {
+        const deltaX = event.clientX - state.startX;
+        const deltaY = event.clientY - state.startY;
+        if (Math.abs(deltaX) >= DRAG_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+          applySwipe(deltaX);
+        }
+      }
+
+      state.pointerId = null;
+      state.origin = null;
+      state.handled = false;
+    };
+
+    const applySwipe = (deltaX: number) => {
+      switch (state.origin) {
+        case "left-open":
+          if (deltaX > DRAG_THRESHOLD) {
+            session.ui.showLibrary = true;
+            session.ui.showMetadata = false;
+            state.handled = true;
+          }
+          break;
+        case "left-close":
+          if (deltaX < -DRAG_THRESHOLD) {
+            session.ui.showLibrary = false;
+            state.handled = true;
+          }
+          break;
+        case "right-open":
+          if (deltaX < -DRAG_THRESHOLD) {
+            session.ui.showMetadata = true;
+            session.ui.showLibrary = false;
+            state.handled = true;
+          }
+          break;
+        case "right-close":
+          if (deltaX > DRAG_THRESHOLD) {
+            session.ui.showMetadata = false;
+            state.handled = true;
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (state.pointerId === null || event.pointerId !== state.pointerId) {
+        return;
+      }
+      const deltaX = event.clientX - state.startX;
+      const deltaY = event.clientY - state.startY;
+      if (!state.handled) {
+        if (Math.abs(deltaX) < DRAG_THRESHOLD || Math.abs(deltaX) <= Math.abs(deltaY)) {
+          return;
+        }
+        applySwipe(deltaX);
+      }
+      if (state.handled) {
+        event.preventDefault();
+      }
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.pointerType !== "touch" || !event.isPrimary) {
+        return;
+      }
+      if (
+        typeof window !== "undefined" &&
+        !window.matchMedia("(max-width: 900px)").matches
+      ) {
+        return;
+      }
+
+      const rect = shell.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const fromLeft = x;
+      const fromRight = rect.width - x;
+
+      let origin: (typeof state.origin) | null = null;
+
+      if (!session.ui.showLibrary && fromLeft <= EDGE_THRESHOLD) {
+        origin = "left-open";
+      } else if (
+        session.ui.showLibrary &&
+        session.ui.leftPanelWidth > 0 &&
+        session.ui.leftPanelWidth - fromLeft <= EDGE_THRESHOLD &&
+        session.ui.leftPanelWidth - fromLeft >= -EDGE_THRESHOLD
+      ) {
+        origin = "left-close";
+      } else if (!session.ui.showMetadata && fromRight <= EDGE_THRESHOLD) {
+        origin = "right-open";
+      } else if (
+        session.ui.showMetadata &&
+        session.ui.rightPanelWidth > 0 &&
+        session.ui.rightPanelWidth - fromRight <= EDGE_THRESHOLD &&
+        session.ui.rightPanelWidth - fromRight >= -EDGE_THRESHOLD
+      ) {
+        origin = "right-close";
+      } else {
+        return;
+      }
+
+      state.pointerId = event.pointerId;
+      state.origin = origin;
+      state.startX = event.clientX;
+      state.startY = event.clientY;
+      state.handled = false;
+
+      shell.setPointerCapture?.(event.pointerId);
+      window.addEventListener("pointermove", handlePointerMove, { passive: false });
+      window.addEventListener("pointerup", handlePointerUp, { passive: true });
+      window.addEventListener("pointercancel", handlePointerUp, { passive: true });
+    };
+
+    shell.addEventListener("pointerdown", handlePointerDown, { passive: false });
+
+    cleanup(() => {
+      shell.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    });
+  });
+
   const clampWidths = $(() => {
     const shell = shellRef.value;
     if (!shell) return;
