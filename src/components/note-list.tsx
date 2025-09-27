@@ -18,6 +18,88 @@ import { createDiaryxRepository } from "../lib/persistence/diaryx-repository";
 import { persistMarkdownNotes } from "../lib/persistence/markdown-store";
 import { deleteNoteOnServer } from "../lib/sync/note-sync";
 import { fetchSharedNotes, SharedNotesError } from "../lib/api/shared-notes";
+import type { DiaryxNote } from "../lib/diaryx/types";
+import {
+  buildDiaryxNoteTree,
+  formatDiaryxLink,
+  normalizeMetadataList,
+} from "../lib/diaryx/note-tree";
+import type { DiaryxNoteTreeNode } from "../lib/diaryx/note-tree";
+import { stampNoteUpdated, syncNoteFrontmatter } from "../lib/diaryx/note-utils";
+
+const slugify = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+
+const ensureUniqueTitle = (baseTitle: string, existing: Set<string>): string => {
+  const normalizedBase = baseTitle.trim() || "Untitled note";
+  const baseKey = normalizedBase.toLowerCase();
+
+  if (!existing.has(baseKey)) {
+    existing.add(baseKey);
+    return normalizedBase;
+  }
+
+  let counter = 2;
+  while (true) {
+    const candidate = `${normalizedBase} ${counter}`.trim();
+    const candidateKey = candidate.toLowerCase();
+    if (!existing.has(candidateKey)) {
+      existing.add(candidateKey);
+      return candidate;
+    }
+    counter += 1;
+  }
+};
+
+const generateUniqueFileName = (
+  baseTitle: string,
+  existing: Set<string>,
+  extension = ".md"
+): string => {
+  const baseSlug = slugify(baseTitle) || "note";
+  let candidate = `${baseSlug}${extension}`;
+  let counter = 2;
+
+  while (existing.has(candidate.toLowerCase())) {
+    candidate = `${baseSlug}-${counter}${extension}`;
+    counter += 1;
+  }
+
+  existing.add(candidate.toLowerCase());
+  return candidate;
+};
+
+const ensureNoteSourceName = (
+  note: DiaryxNote,
+  existing: Set<string>,
+  fallbackTitle?: string
+): string => {
+  const current = note.sourceName?.trim();
+  if (current) {
+    existing.add(current.toLowerCase());
+    return current;
+  }
+
+  const generated = generateUniqueFileName(
+    fallbackTitle ?? note.metadata.title ?? "note",
+    existing
+  );
+  note.sourceName = generated;
+  return generated;
+};
+
+interface NoteListDisplayItem {
+  note: DiaryxNote;
+  depth: number;
+  hasChildren: boolean;
+  isExpanded: boolean;
+  matchesSearch: boolean;
+  descendantMatches: boolean;
+}
 
 export const NoteList = component$(() => {
   const session = useDiaryxSession();
@@ -76,6 +158,14 @@ export const NoteList = component$(() => {
       session.sharedActiveNoteId = noteId;
     } else {
       session.activeNoteId = noteId;
+      const tree = buildDiaryxNoteTree(session.notes);
+      const expanded = { ...session.ui.expandedNotes };
+      let current = tree.parentById.get(noteId);
+      while (current) {
+        expanded[current] = true;
+        current = tree.parentById.get(current);
+      }
+      session.ui.expandedNotes = expanded;
     }
   });
 
@@ -206,6 +296,112 @@ export const NoteList = component$(() => {
     exportFormatSignal.value = "";
   });
 
+  const handleToggleExpand = $((noteId: string, event?: Event) => {
+    event?.stopPropagation();
+    if (session.ui.libraryMode === "shared") {
+      return;
+    }
+
+    const expandedEntries = session.ui.expandedNotes ?? {};
+    const isExpanded = Boolean(expandedEntries[noteId]);
+    const nextExpanded = { ...expandedEntries };
+
+    if (isExpanded) {
+      delete nextExpanded[noteId];
+    } else {
+      nextExpanded[noteId] = true;
+    }
+
+    if (isExpanded) {
+      const tree = buildDiaryxNoteTree(session.notes);
+      const node = tree.nodesById.get(noteId);
+      if (node) {
+        const descendants = new Set<string>();
+        const stack: DiaryxNoteTreeNode[] = [...node.children];
+        while (stack.length) {
+          const currentNode = stack.pop();
+          if (!currentNode) continue;
+          if (descendants.has(currentNode.note.id)) {
+            continue;
+          }
+          descendants.add(currentNode.note.id);
+          if (currentNode.children.length) {
+            stack.push(...currentNode.children);
+          }
+        }
+        const activeId = session.activeNoteId;
+        if (activeId && activeId !== noteId && descendants.has(activeId)) {
+          session.activeNoteId = noteId;
+        }
+      }
+    }
+
+    session.ui.expandedNotes = nextExpanded;
+  });
+
+  const handleCreateChild = $((parentId: string, event?: Event) => {
+    event?.stopPropagation();
+    if (session.ui.libraryMode === "shared") {
+      return;
+    }
+
+    const parent = session.notes.find((note) => note.id === parentId);
+    if (!parent) return;
+
+    const existingTitles = new Set<string>();
+    for (const note of session.notes) {
+      const titleKey = String(note.metadata.title ?? "").trim().toLowerCase();
+      if (titleKey) {
+        existingTitles.add(titleKey);
+      }
+    }
+
+    const childTitle = ensureUniqueTitle("Untitled note", existingTitles);
+
+    const existingFileNames = new Set<string>();
+    for (const note of session.notes) {
+      const source = note.sourceName?.trim();
+      if (source) {
+        existingFileNames.add(source.toLowerCase());
+      }
+    }
+
+    const parentLabel = parent.metadata.title?.trim() || "Parent note";
+    const parentFileName = ensureNoteSourceName(parent, existingFileNames, parentLabel);
+    const childFileName = generateUniqueFileName(childTitle, existingFileNames);
+
+    const childLink = formatDiaryxLink(childTitle, childFileName);
+    const parentLink = formatDiaryxLink(parentLabel, parentFileName);
+
+    const contentsList = normalizeMetadataList(
+      parent.metadata.contents as string | string[] | undefined
+    );
+    if (!contentsList.includes(childLink)) {
+      contentsList.push(childLink);
+    }
+    parent.metadata.contents = contentsList;
+    stampNoteUpdated(parent);
+    syncNoteFrontmatter(parent);
+
+    const newNote = createBlankNote({
+      metadata: {
+        title: childTitle,
+        part_of: parentLink,
+      },
+      sourceName: childFileName,
+    });
+    syncNoteFrontmatter(newNote);
+
+    session.notes.unshift(newNote);
+    session.activeNoteId = newNote.id;
+    session.ui.expandedNotes = {
+      ...session.ui.expandedNotes,
+      [parentId]: true,
+    };
+
+    persistMarkdownNotes(session.notes);
+  });
+
   const handleOpenSettings = $(() => {
     session.ui.showSettings = true;
   });
@@ -260,17 +456,133 @@ export const NoteList = component$(() => {
   });
 
   const libraryMode = session.ui.libraryMode;
-  const activeCollection = libraryMode === "shared" ? session.sharedNotes : session.notes;
+  const isSharedView = libraryMode === "shared";
+  const activeCollection = isSharedView ? session.sharedNotes : session.notes;
+  const activeNoteId = isSharedView ? session.sharedActiveNoteId : session.activeNoteId;
   const searchQuery = querySignal.value.trim().toLowerCase();
-  const filteredNotes = activeCollection.filter((note) => {
-    if (!searchQuery) return true;
+  const isSearching = searchQuery.length > 0;
+
+  const noteMatchesQuery = (note: DiaryxNote): boolean => {
+    if (!isSearching) return true;
     const titleMatch = String(note.metadata.title ?? "")
       .toLowerCase()
       .includes(searchQuery);
     const bodyMatch = note.body.toLowerCase().includes(searchQuery);
-    const authorMatch = authorLabel(note.metadata.author).toLowerCase().includes(searchQuery);
+    const authorMatch = authorLabel(note.metadata.author)
+      .toLowerCase()
+      .includes(searchQuery);
     return titleMatch || bodyMatch || authorMatch;
-  });
+  };
+
+  const sharedNotesToDisplay = isSharedView
+    ? activeCollection.filter((note) => !isSearching || noteMatchesQuery(note))
+    : [];
+
+  const treeDisplayItems: NoteListDisplayItem[] = [];
+
+  if (!isSharedView) {
+    const tree = buildDiaryxNoteTree(activeCollection);
+    const expandedEntries = session.ui.expandedNotes ?? {};
+    const expandedSet = new Set(
+      Object.entries(expandedEntries)
+        .filter(([, value]) => Boolean(value))
+        .map(([key]) => key)
+    );
+
+    const ancestorsOfActive = new Set<string>();
+    let walker = activeNoteId ? tree.parentById.get(activeNoteId) : undefined;
+    while (walker) {
+      if (ancestorsOfActive.has(walker)) {
+        break;
+      }
+      ancestorsOfActive.add(walker);
+      walker = tree.parentById.get(walker);
+    }
+
+    const traverse = (
+      node: DiaryxNoteTreeNode,
+      depth: number,
+      visited: Set<string>
+    ): { hasMatch: boolean; items: NoteListDisplayItem[] } => {
+      if (visited.has(node.note.id)) {
+        return { hasMatch: false, items: [] };
+      }
+      visited.add(node.note.id);
+
+      const childResults = node.children.map((child) =>
+        traverse(child, depth + 1, visited)
+      );
+      const hasMatchingChild = childResults.some((result) => result.hasMatch);
+      const matchesSearch = isSearching ? noteMatchesQuery(node.note) : false;
+      const isActive = node.note.id === activeNoteId;
+      const shouldInclude =
+        !isSearching ||
+        matchesSearch ||
+        hasMatchingChild ||
+        isActive ||
+        ancestorsOfActive.has(node.note.id);
+      const isExpanded =
+        isSearching ||
+        expandedSet.has(node.note.id) ||
+        ancestorsOfActive.has(node.note.id) ||
+        isActive ||
+        node.note.metadata.this_file_is_root_index === true;
+
+      const items: NoteListDisplayItem[] = [];
+      if (shouldInclude) {
+        items.push({
+          note: node.note,
+          depth,
+          hasChildren: node.children.length > 0,
+          isExpanded,
+          matchesSearch,
+          descendantMatches: hasMatchingChild,
+        });
+        if ((isSearching || isExpanded) && node.children.length) {
+          for (const result of childResults) {
+            if (result.items.length) {
+              items.push(...result.items);
+            }
+          }
+        }
+      }
+
+      visited.delete(node.note.id);
+
+      const hasMatch =
+        matchesSearch ||
+        hasMatchingChild ||
+        isActive ||
+        ancestorsOfActive.has(node.note.id);
+
+      return {
+        hasMatch,
+        items,
+      };
+    };
+
+    for (const root of tree.roots) {
+      const result = traverse(root, 0, new Set());
+      if (result.items.length) {
+        treeDisplayItems.push(...result.items);
+      }
+    }
+
+    for (const note of activeCollection) {
+      if (treeDisplayItems.some((item) => item.note.id === note.id)) {
+        continue;
+      }
+      const matchesSearch = isSearching ? noteMatchesQuery(note) : false;
+      treeDisplayItems.push({
+        note,
+        depth: 0,
+        hasChildren: false,
+        isExpanded: false,
+        matchesSearch,
+        descendantMatches: false,
+      });
+    }
+  }
 
   // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(({ track, cleanup }) => {
@@ -398,49 +710,100 @@ export const NoteList = component$(() => {
           session.sharedNotesState.lastError && (
             <li class="note-empty">{session.sharedNotesState.lastError}</li>
           )}
-        {filteredNotes.map((note) => {
-          const isActive =
-            libraryMode === "shared"
-              ? session.sharedActiveNoteId === note.id
-              : session.activeNoteId === note.id;
-          const preview = note.body.split("\n")[0]?.slice(0, 80) ?? "";
-          const author = authorLabel(note.metadata.author);
-          return (
-            <li key={note.id} class={{ active: isActive }}>
-              <button
-                type="button"
-                class="note-open"
-                onClick$={() => handleSelect(note.id)}
-              >
-                <span class="title">
-                  {note.metadata.title}
-                  {libraryMode === "shared" && author && (
-                    <span class="shared-author"> — {author}</span>
-                  )}
-                </span>
-                <span class="preview">{preview}</span>
-              </button>
-              {libraryMode !== "shared" && (
+        {isSharedView &&
+          sharedNotesToDisplay.map((note) => {
+            const isActive = session.sharedActiveNoteId === note.id;
+            const preview = note.body.split("\n")[0]?.slice(0, 80) ?? "";
+            const author = authorLabel(note.metadata.author);
+            return (
+              <li key={note.id} class={{ active: isActive }}>
                 <button
                   type="button"
-                  class="note-delete"
-                  aria-label="Delete note"
-                  title="Delete note"
-                  onClick$={(event) => handleDeleteNote(note.id, event)}
+                  class="note-open"
+                  onClick$={() => handleSelect(note.id)}
                 >
-                  ×
+                  <span class="title">
+                    {note.metadata.title}
+                    {author && <span class="shared-author"> — {author}</span>}
+                  </span>
+                  <span class="preview">{preview}</span>
                 </button>
-              )}
-            </li>
-          );
-        })}
-        {libraryMode === "shared" &&
+              </li>
+            );
+          })}
+        {!isSharedView &&
+          treeDisplayItems.map((item) => {
+            const note = item.note;
+            const isActive = session.activeNoteId === note.id;
+            const preview = note.body.split("\n")[0]?.slice(0, 80) ?? "";
+            const indent = Math.max(item.depth, 0) * 16;
+            return (
+              <li
+                key={note.id}
+                class={{ active: isActive, "has-children": item.hasChildren }}
+                data-depth={item.depth}
+              >
+                <div
+                  class="note-row"
+                  style={{ paddingInlineStart: `${indent}px` }}
+                >
+                  {item.hasChildren ? (
+                    <button
+                      type="button"
+                      class="note-toggle"
+                      data-expanded={item.isExpanded}
+                      aria-label={`${item.isExpanded ? "Collapse" : "Expand"} ${note.metadata.title || "note"}`}
+                      onClick$={(event) => handleToggleExpand(note.id, event)}
+                    />
+                  ) : (
+                    <span class="note-toggle placeholder" aria-hidden="true" />
+                  )}
+                  <button
+                    type="button"
+                    class="note-open"
+                    onClick$={() => handleSelect(note.id)}
+                  >
+                    <span class="title">{note.metadata.title}</span>
+                    <span class="preview">{preview}</span>
+                  </button>
+                  <div class="note-row-actions">
+                    <button
+                      type="button"
+                      class="note-add-child"
+                      aria-label="Add child note"
+                      title="Add child note"
+                      onClick$={(event) => handleCreateChild(note.id, event)}
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      class="note-delete"
+                      aria-label="Delete note"
+                      title="Delete note"
+                      onClick$={(event) => handleDeleteNote(note.id, event)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        {isSharedView &&
           !session.sharedNotesState.isLoading &&
           !session.sharedNotesState.isUnauthorized &&
           !session.sharedNotesState.lastError &&
-          !filteredNotes.length && (
-            <li class="note-empty">No shared notes yet.</li>
+          !sharedNotesToDisplay.length && (
+            <li class="note-empty">
+              {isSearching ? "No shared notes match your search." : "No shared notes yet."}
+            </li>
           )}
+        {!isSharedView && !treeDisplayItems.length && (
+          <li class="note-empty">
+            {isSearching ? "No notes match your search." : "No notes yet."}
+          </li>
+        )}
       </ul>
       {session.ui.showSettings && (
         <div

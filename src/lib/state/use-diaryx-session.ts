@@ -24,6 +24,7 @@ const createInitialState = (): DiaryxSessionState => {
       showSettings: false,
       libraryMode: "all",
       editorHasFocus: false,
+      expandedNotes: {},
     },
     importState: {
       isImporting: false,

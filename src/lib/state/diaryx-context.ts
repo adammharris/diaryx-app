@@ -18,6 +18,7 @@ export interface DiaryxUiState {
   showSettings: boolean;
   libraryMode: LibraryMode;
   editorHasFocus: boolean;
+  expandedNotes: Record<string, boolean>;
 }
 
 export interface DiaryxSessionState {
