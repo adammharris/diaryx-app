@@ -17,6 +17,7 @@ export interface DiaryxUiState {
   editorMode: "split" | "source" | "preview" | "live";
   showSettings: boolean;
   libraryMode: LibraryMode;
+  editorHasFocus: boolean;
 }
 
 export interface DiaryxSessionState {
