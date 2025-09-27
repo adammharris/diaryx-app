@@ -784,11 +784,6 @@ export const NoteList = component$(() => {
                   class="note-row"
                   style={{ paddingInlineStart: `${indent}px` }}
                   data-note-actions={openMenuId.value === note.id ? "open" : undefined}
-                  onPointerLeave$={() => {
-                    if (openMenuId.value === note.id) {
-                      openMenuId.value = undefined;
-                    }
-                  }}
                 >
                   {item.hasChildren ? (
                     <button
@@ -818,15 +813,7 @@ export const NoteList = component$(() => {
                       ⋯
                     </button>
                     {openMenuId.value === note.id && (
-                      <div
-                        class="note-menu"
-                        role="menu"
-                        onPointerLeave$={() => {
-                          if (openMenuId.value === note.id) {
-                            openMenuId.value = undefined;
-                          }
-                        }}
-                      >
+                      <div class="note-menu" role="menu">
                         <button
                           type="button"
                           role="menuitem"
