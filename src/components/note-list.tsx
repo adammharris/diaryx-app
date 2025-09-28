@@ -115,6 +115,9 @@ export const NoteList = component$(() => {
   const displaySectionOpen = useSignal(false);
   const noteListRef = useSignal<HTMLElement>();
   const openMenuId = useSignal<string | undefined>(undefined);
+  const dragNoteId = useSignal<string | undefined>(undefined);
+  const dropTargetId = useSignal<string | undefined>(undefined);
+  const dragSourceId = useSignal<string | undefined>(undefined);
 
   const themeOptions: ReadonlyArray<{
     value: ThemePreference;
@@ -589,6 +592,74 @@ export const NoteList = component$(() => {
     }
   });
 
+  const handleMoveNote = $(
+    (childId: string, parentId: string) => {
+      if (childId === parentId) return;
+      const tree = buildDiaryxNoteTree(session.notes);
+      const childNode = tree.nodesById.get(childId);
+      const parentNode = tree.nodesById.get(parentId);
+      if (!childNode || !parentNode) return;
+
+      const stack = [...childNode.children];
+      while (stack.length) {
+        const current = stack.pop();
+        if (!current) continue;
+        if (current.note.id === parentId) {
+          return;
+        }
+        if (current.children.length) {
+          stack.push(...current.children);
+        }
+      }
+
+      const child = childNode.note;
+      const parent = parentNode.note;
+      const childTitle = child.metadata.title?.trim() || "Untitled";
+      const childLink = `[${childTitle}](<${childTitle}.md>)`;
+
+      const parentContents = normalizeMetadataList(
+        parent.metadata.contents as string | string[] | undefined
+      ).filter((item) => item.trim() !== childLink.trim());
+      parentContents.push(childLink);
+      parent.metadata.contents =
+        parentContents.length === 1 ? parentContents[0] : parentContents;
+      stampNoteUpdated(parent);
+      syncNoteFrontmatter(parent);
+
+      const previousParentId = tree.parentById.get(childId);
+      if (previousParentId && previousParentId !== parentId) {
+        const previousParent = session.notes.find((note) => note.id === previousParentId);
+        if (previousParent) {
+          const previousContents = normalizeMetadataList(
+            previousParent.metadata.contents as string | string[] | undefined
+          ).filter((item) => item.trim() !== childLink.trim());
+          if (!previousContents.length) {
+            delete previousParent.metadata.contents;
+          } else {
+            previousParent.metadata.contents =
+              previousContents.length === 1
+                ? previousContents[0]
+                : previousContents;
+          }
+          stampNoteUpdated(previousParent);
+          syncNoteFrontmatter(previousParent);
+        }
+      }
+
+      const parentTitle = parent.metadata.title?.trim() || "Untitled";
+      child.metadata.part_of = `[${parentTitle}](<${parentTitle}.md>)`;
+      stampNoteUpdated(child);
+      syncNoteFrontmatter(child);
+
+      session.ui.expandedNotes = {
+        ...session.ui.expandedNotes,
+        [parentId]: true,
+      };
+
+      persistMarkdownNotes(session.notes);
+    }
+  );
+
   const libraryMode = session.ui.libraryMode;
   const isSharedView = libraryMode === "shared";
   const activeCollection = isSharedView ? session.sharedNotes : session.notes;
@@ -769,6 +840,94 @@ export const NoteList = component$(() => {
 
   // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(({ track, cleanup }) => {
+    track(() => session.ui.libraryMode);
+    track(() => session.notes.length);
+    const root = noteListRef.value;
+    if (!root) return;
+    const list = root.querySelector<HTMLUListElement>(".note-items");
+    if (!list) return;
+
+    const getNoteId = (element: EventTarget | null): string | undefined => {
+      const node = (element as HTMLElement | null)?.closest<HTMLElement>("li[data-note-id]");
+      return node?.dataset.noteId;
+    };
+
+    const handleDragStart = (event: DragEvent) => {
+      if (session.ui.libraryMode === "shared") return;
+      const noteId = getNoteId(event.target);
+      if (!noteId) return;
+      dragNoteId.value = noteId;
+      dragSourceId.value = noteId;
+      dropTargetId.value = undefined;
+      event.dataTransfer?.setData("text/plain", noteId);
+      try {
+        event.dataTransfer?.setDragImage?.(new Image(), 0, 0);
+      } catch {
+        // ignore
+      }
+      event.dataTransfer?.effectAllowed = "move";
+    };
+
+    const handleDragOver = (event: DragEvent) => {
+      if (session.ui.libraryMode === "shared") return;
+      const noteId = getNoteId(event.target);
+      if (!noteId || !dragNoteId.value || dragNoteId.value === noteId) {
+        return;
+      }
+      event.preventDefault();
+      dropTargetId.value = noteId;
+    };
+
+    const handleDragLeave = (event: DragEvent) => {
+      if (!dropTargetId.value) return;
+      const noteId = getNoteId(event.target);
+      if (!noteId) return;
+      const related = event.relatedTarget as Node | null;
+      const current = (event.target as HTMLElement | null) ?? undefined;
+      if (current && related && current.contains(related)) {
+        return;
+      }
+      if (dropTargetId.value === noteId) {
+        dropTargetId.value = undefined;
+      }
+    };
+
+    const handleDrop = (event: DragEvent) => {
+      if (session.ui.libraryMode === "shared") return;
+      event.preventDefault();
+      const parentId = getNoteId(event.target);
+      if (!parentId) return;
+      const childId = dragNoteId.value || event.dataTransfer?.getData("text/plain");
+      dragNoteId.value = undefined;
+      dropTargetId.value = undefined;
+      dragSourceId.value = undefined;
+      if (!childId || childId === parentId) return;
+      void handleMoveNote(childId, parentId);
+    };
+
+    const handleDragEnd = () => {
+      dragNoteId.value = undefined;
+      dropTargetId.value = undefined;
+      dragSourceId.value = undefined;
+    };
+
+    list.addEventListener("dragstart", handleDragStart);
+    list.addEventListener("dragover", handleDragOver);
+    list.addEventListener("dragleave", handleDragLeave);
+    list.addEventListener("drop", handleDrop);
+    list.addEventListener("dragend", handleDragEnd);
+
+    cleanup(() => {
+      list.removeEventListener("dragstart", handleDragStart);
+      list.removeEventListener("dragover", handleDragOver);
+      list.removeEventListener("dragleave", handleDragLeave);
+      list.removeEventListener("drop", handleDrop);
+      list.removeEventListener("dragend", handleDragEnd);
+    });
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track, cleanup }) => {
     track(() => session.ui.showSettings);
     if (!session.ui.showSettings) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -938,8 +1097,15 @@ export const NoteList = component$(() => {
             return (
               <li
                 key={note.id}
-                class={{ active: isActive, "has-children": item.hasChildren }}
+                class={{
+                  active: isActive,
+                  "has-children": item.hasChildren,
+                  "drop-target": dropTargetId.value === note.id,
+                }}
                 data-depth={item.depth}
+                draggable={!isSharedView}
+                data-note-id={note.id}
+                data-drag-source={dragSourceId.value === note.id ? "true" : undefined}
               >
                 <div
                   class="note-row"

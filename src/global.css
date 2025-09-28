@@ -1007,6 +1007,7 @@ select {
   border-radius: 14px;
   text-align: left;
   cursor: pointer;
+  cursor: grab;
   color: inherit;
   display: flex;
   align-items: center;
@@ -1026,6 +1027,15 @@ select {
   background: var(--accent-surface);
   box-shadow: inset 0 0 0 1px var(--accent-ring);
   font-weight: 600;
+}
+
+.note-list li.drop-target .note-open {
+  background: color-mix(in srgb, var(--accent-primary) 25%, transparent);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
+}
+
+.note-list li[data-drag-source="true"] .note-open {
+  cursor: grabbing;
 }
 
 .note-list li .note-open:focus-visible {
