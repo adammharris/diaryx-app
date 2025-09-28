@@ -68,6 +68,8 @@
     "hast-util-to-string": "^3.0.1",
     "idb-keyval": "^6.2.2",
     "js-yaml": "^4.1.0",
+    "jszip": "^3.10.1",
+    "jzip": "^1.0.0",
     "markdown-it": "^14.1.0",
     "micromark": "^4.0.2",
     "micromark-extension-frontmatter": "^2.0.0",

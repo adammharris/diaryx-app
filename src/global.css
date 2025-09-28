@@ -981,6 +981,32 @@ select {
   color: #dc2626;
 }
 
+.note-list .note-menu .menu-divider {
+  height: 1px;
+  width: 100%;
+  background: var(--surface-border);
+  margin: 0.15rem 0;
+}
+
+.note-list .note-menu .submenu-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.note-list .note-menu .note-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.2rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid var(--surface-border);
+}
+
+.note-list .note-menu .note-submenu button {
+  font-size: 0.85rem;
+}
+
 .note-list .note-items .note-empty {
   display: block;
   width: 100%;

@@ -96,6 +96,17 @@ const ensureNoteSourceName = (
   return generated;
 };
 
+const triggerDownload = (blob: Blob, filename: string) => {
+  if (typeof document === "undefined") return;
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+};
+
 interface NoteListDisplayItem {
   note: DiaryxNote;
   depth: number;
@@ -118,6 +129,7 @@ export const NoteList = component$(() => {
   const dragNoteId = useSignal<string | undefined>(undefined);
   const dropTargetId = useSignal<string | undefined>(undefined);
   const dragSourceId = useSignal<string | undefined>(undefined);
+  const openExportMenuId = useSignal<string | undefined>(undefined);
 
   const themeOptions: ReadonlyArray<{
     value: ThemePreference;
@@ -393,7 +405,13 @@ export const NoteList = component$(() => {
     if (session.ui.libraryMode === "shared") {
       return;
     }
-    openMenuId.value = openMenuId.value === noteId ? undefined : noteId;
+    if (openMenuId.value === noteId) {
+      openMenuId.value = undefined;
+      openExportMenuId.value = undefined;
+    } else {
+      openMenuId.value = noteId;
+      openExportMenuId.value = undefined;
+    }
   });
 
   const handleMenuAction = $((
@@ -403,6 +421,7 @@ export const NoteList = component$(() => {
   ) => {
     event?.stopPropagation();
     openMenuId.value = undefined;
+    openExportMenuId.value = undefined;
     if (action === "add-child") {
       handleCreateChild(noteId);
     } else {
@@ -660,6 +679,127 @@ export const NoteList = component$(() => {
     }
   );
 
+  const handleToggleExportMenu = $((noteId: string, event?: Event) => {
+    event?.stopPropagation();
+    if (openExportMenuId.value === noteId) {
+      openExportMenuId.value = undefined;
+    } else {
+      openExportMenuId.value = noteId;
+    }
+  });
+
+  const handleExportSubtree = $(
+    async (noteId: string, format: "markdown" | "html") => {
+      if (typeof window === "undefined") return;
+      openExportMenuId.value = undefined;
+      openMenuId.value = undefined;
+
+      const tree = buildDiaryxNoteTree(session.notes);
+      const rootNode = tree.nodesById.get(noteId);
+      if (!rootNode) return;
+
+      const entries: Array<{ note: DiaryxNote; path: string }> = [];
+      const extension = format === "markdown" ? "md" : "html";
+      const usedNames = new Map<string, Set<string>>();
+
+      const ensureUniqueName = (
+        folderKey: string,
+        base: string,
+        kind: "file" | "folder"
+      ): string => {
+        const key = `${folderKey}::${kind}`;
+        let set = usedNames.get(key);
+        if (!set) {
+          set = new Set();
+          usedNames.set(key, set);
+        }
+        const fallback = kind === "file" ? "note" : "notes";
+        const baseName = base || fallback;
+        let candidate = baseName;
+        let counter = 2;
+        while (set.has(candidate)) {
+          candidate = `${baseName}-${counter++}`;
+        }
+        set.add(candidate);
+        return candidate;
+      };
+
+      const traverse = (
+        node: DiaryxNoteTreeNode,
+        folderKey: string,
+        folderPath: string
+      ) => {
+        const title = node.note.metadata.title?.trim() || "Untitled";
+        const baseSlug = slugify(title) || "note";
+        const uniqueSlug = ensureUniqueName(folderKey, baseSlug, "file");
+        const fileName = `${uniqueSlug}.${extension}`;
+        const filePath = folderPath ? `${folderPath}/${fileName}` : fileName;
+        entries.push({ note: node.note, path: filePath });
+
+        if (node.children.length) {
+          const folderBase = `${uniqueSlug}-contents`;
+          const uniqueFolder = ensureUniqueName(folderKey, folderBase, "folder");
+          const childFolderPath = folderPath
+            ? `${folderPath}/${uniqueFolder}`
+            : uniqueFolder;
+          const childFolderKey = childFolderPath || uniqueFolder;
+          for (const child of node.children) {
+            traverse(child, childFolderKey, childFolderPath);
+          }
+        }
+      };
+
+      traverse(rootNode, "__root__", "");
+
+      if (!entries.length) return;
+
+      session.exportState.isExporting = true;
+      session.exportState.lastSuccessFormat = undefined;
+
+      try {
+        if (entries.length === 1 && !rootNode.children.length) {
+          const entry = entries[0];
+          const content =
+            format === "markdown"
+              ? exportDiaryxNoteToMarkdown(entry.note, {
+                  includeFrontmatter: true,
+                })
+              : exportDiaryxNoteToHtml(entry.note);
+          const blob = new Blob(
+            [content],
+            {
+              type: format === "markdown" ? "text/markdown" : "text/html",
+            }
+          );
+          triggerDownload(blob, entry.path.split("/").pop() ?? `note.${extension}`);
+        } else {
+          const { default: JSZip } = await import("jszip");
+          const zip = new JSZip();
+          for (const entry of entries) {
+            const content =
+              format === "markdown"
+                ? exportDiaryxNoteToMarkdown(entry.note, {
+                    includeFrontmatter: true,
+                  })
+                : exportDiaryxNoteToHtml(entry.note);
+            zip.file(entry.path, content);
+          }
+          const blob = await zip.generateAsync({ type: "blob" });
+          const rootTitle = rootNode.note.metadata.title?.trim() || "note-tree";
+          const archiveName = `${slugify(rootTitle) || "note-tree"}-${format}.zip`;
+          triggerDownload(blob, archiveName);
+        }
+
+        session.exportState.lastSuccessAt = Date.now();
+        session.exportState.lastSuccessFormat = format;
+      } catch (error) {
+        console.error("Subtree export failed", error);
+      } finally {
+        session.exportState.isExporting = false;
+      }
+    }
+  );
+
   const libraryMode = session.ui.libraryMode;
   const isSharedView = libraryMode === "shared";
   const activeCollection = isSharedView ? session.sharedNotes : session.notes;
@@ -823,6 +963,7 @@ export const NoteList = component$(() => {
       const target = event.target as HTMLElement | null;
       if (!target?.closest('[data-note-actions]')) {
         openMenuId.value = undefined;
+        openExportMenuId.value = undefined;
       }
     };
     window.addEventListener("pointerdown", handlePointerDown);
@@ -868,27 +1009,38 @@ export const NoteList = component$(() => {
       event.dataTransfer?.effectAllowed = "move";
     };
 
-    const handleDragOver = (event: DragEvent) => {
+    const handleDragEnter = (event: DragEvent) => {
       if (session.ui.libraryMode === "shared") return;
       const noteId = getNoteId(event.target);
-      if (!noteId || !dragNoteId.value || dragNoteId.value === noteId) {
+      if (!noteId || !dragNoteId.value) {
+        dropTargetId.value = undefined;
+        return;
+      }
+      if (dragNoteId.value === noteId) {
+        dropTargetId.value = undefined;
         return;
       }
       event.preventDefault();
-      dropTargetId.value = noteId;
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "move";
+      }
+      if (dropTargetId.value !== noteId) {
+        dropTargetId.value = noteId;
+      }
     };
 
-    const handleDragLeave = (event: DragEvent) => {
-      if (!dropTargetId.value) return;
+    const handleDragOver = (event: DragEvent) => {
+      if (!dragNoteId.value) return;
+      if (session.ui.libraryMode === "shared") return;
       const noteId = getNoteId(event.target);
-      if (!noteId) return;
-      const related = event.relatedTarget as Node | null;
-      const current = (event.target as HTMLElement | null) ?? undefined;
-      if (current && related && current.contains(related)) {
+      if (!noteId || dragNoteId.value === noteId) {
+        event.preventDefault();
+        dropTargetId.value = undefined;
         return;
       }
-      if (dropTargetId.value === noteId) {
-        dropTargetId.value = undefined;
+      event.preventDefault();
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "move";
       }
     };
 
@@ -912,15 +1064,15 @@ export const NoteList = component$(() => {
     };
 
     list.addEventListener("dragstart", handleDragStart);
+    list.addEventListener("dragenter", handleDragEnter, true);
     list.addEventListener("dragover", handleDragOver);
-    list.addEventListener("dragleave", handleDragLeave);
     list.addEventListener("drop", handleDrop);
     list.addEventListener("dragend", handleDragEnd);
 
     cleanup(() => {
       list.removeEventListener("dragstart", handleDragStart);
+      list.removeEventListener("dragenter", handleDragEnter, true);
       list.removeEventListener("dragover", handleDragOver);
-      list.removeEventListener("dragleave", handleDragLeave);
       list.removeEventListener("drop", handleDrop);
       list.removeEventListener("dragend", handleDragEnd);
     });
@@ -1148,6 +1300,37 @@ export const NoteList = component$(() => {
                         >
                           Add child note
                         </button>
+                        <div class="menu-divider" />
+                        <div class="submenu-group">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            class="note-menu-export"
+                            aria-expanded={openExportMenuId.value === note.id ? "true" : "false"}
+                            onClick$={(event) => handleToggleExportMenu(note.id, event)}
+                          >
+                            Export ▸
+                          </button>
+                          {openExportMenuId.value === note.id && (
+                            <div class="note-submenu" role="menu">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick$={() => handleExportSubtree(note.id, "markdown")}
+                              >
+                                Export Markdown
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick$={() => handleExportSubtree(note.id, "html")}
+                              >
+                                Export HTML
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div class="menu-divider" />
                         <button
                           type="button"
                           role="menuitem"
