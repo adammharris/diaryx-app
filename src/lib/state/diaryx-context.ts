@@ -32,6 +32,7 @@ export interface DiaryxSessionState {
   importState: {
     isImporting: boolean;
     lastError?: string;
+    lastSummary?: string;
   };
   exportState: {
     isExporting: boolean;

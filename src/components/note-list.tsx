@@ -26,6 +26,10 @@ import {
 } from "../lib/diaryx/note-tree";
 import type { DiaryxNoteTreeNode } from "../lib/diaryx/note-tree";
 import { stampNoteUpdated, syncNoteFrontmatter } from "../lib/diaryx/note-utils";
+import {
+  importBatchNotes,
+  normalizePath as normalizeImportPath,
+} from "../lib/import/batch-import";
 
 const slugify = (value: string): string =>
   value
@@ -105,6 +109,7 @@ export const NoteList = component$(() => {
   const session = useDiaryxSession();
   const querySignal = useSignal(session.filters.query);
   const fileInputSignal = useSignal<HTMLInputElement>();
+  const folderInputSignal = useSignal<HTMLInputElement>();
   const exportFormatSignal = useSignal("");
   const accountSectionOpen = useSignal(false);
   const displaySectionOpen = useSignal(false);
@@ -430,6 +435,7 @@ export const NoteList = component$(() => {
     if (!files?.length) return;
     session.importState.isImporting = true;
     session.importState.lastError = undefined;
+    session.importState.lastSummary = undefined;
     const imported: string[] = [];
     try {
       for (const file of Array.from(files)) {
@@ -452,6 +458,134 @@ export const NoteList = component$(() => {
       }
     } finally {
       session.importState.isImporting = false;
+    }
+  });
+
+  const handleBatchImport = $(async (files: FileList | null) => {
+    if (!files?.length) return;
+    session.importState.isImporting = true;
+    session.importState.lastError = undefined;
+    session.importState.lastSummary = undefined;
+    try {
+      const inputs = Array.from(files)
+        .map((file) => ({
+          file,
+          relativePath:
+            (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+            file.name,
+        }))
+        .filter((item) => Boolean(item.relativePath));
+
+      if (!inputs.length) {
+        session.importState.lastError = "Selected folder does not contain Markdown files.";
+        return;
+      }
+
+      const result = await importBatchNotes(inputs);
+
+      const existingPaths = new Set(
+        session.notes
+          .map((note) =>
+            note.sourceName ? normalizeImportPath(note.sourceName) : undefined
+          )
+          .filter((value): value is string => Boolean(value))
+      );
+
+      const importedNotes: DiaryxNote[] = [];
+      const duplicates: string[] = [];
+
+      for (const note of result.notes) {
+        const source = note.sourceName
+          ? normalizeImportPath(note.sourceName)
+          : undefined;
+        if (source && existingPaths.has(source)) {
+          duplicates.push(note.sourceName ?? note.metadata.title ?? note.id);
+          continue;
+        }
+        if (source) {
+          existingPaths.add(source);
+        }
+        importedNotes.push(note);
+      }
+
+      for (let i = importedNotes.length - 1; i >= 0; i--) {
+        session.notes.unshift(importedNotes[i]);
+      }
+
+      if (importedNotes.length) {
+        const normalizedRoots = result.roots.map(normalizeImportPath);
+        const rootNote = normalizedRoots
+          .map((rootPath) =>
+            importedNotes.find(
+              (note) =>
+                note.sourceName &&
+                normalizeImportPath(note.sourceName) === rootPath
+            )
+          )
+          .find((note): note is DiaryxNote => Boolean(note));
+        session.activeNoteId = (rootNote ?? importedNotes[0]).id;
+        persistMarkdownNotes(session.notes);
+      }
+
+      const summaryParts: string[] = [];
+      summaryParts.push(
+        `Imported ${importedNotes.length}/${result.notes.length} note${
+          result.notes.length === 1 ? "" : "s"
+        }`
+      );
+      if (result.roots.length) {
+        summaryParts.push(`Roots: ${result.roots.join(", ")}`);
+      }
+      if (duplicates.length) {
+        summaryParts.push(`${duplicates.length} already in library`);
+      }
+      if (result.skipped.length) {
+        summaryParts.push(`${result.skipped.length} skipped in folder`);
+      }
+      if (result.unresolved.length) {
+        summaryParts.push(
+          `${result.unresolved.length} unresolved link${
+            result.unresolved.length === 1 ? "" : "s"
+          }`
+        );
+      }
+      if (result.errors.length) {
+        summaryParts.push(
+          `${result.errors.length} parse error${
+            result.errors.length === 1 ? "" : "s"
+          }`
+        );
+      }
+      session.importState.lastSummary = summaryParts.join(" · ");
+
+      const problems: string[] = [];
+      if (result.errors.length) {
+        problems.push(result.errors.slice(0, 3).join("; "));
+      }
+      if (result.unresolved.length) {
+        const unresolvedPreview = result.unresolved
+          .slice(0, 3)
+          .map((item) => `${item.parent} → ${item.target}`)
+          .join("; ");
+        problems.push(`Unresolved: ${unresolvedPreview}`);
+      }
+      session.importState.lastError = problems.length
+        ? problems.join(" · ")
+        : undefined;
+    } catch (error) {
+      session.importState.lastSummary = undefined;
+      session.importState.lastError =
+        error instanceof Error ? error.message : "Unable to import folder.";
+    } finally {
+      session.importState.isImporting = false;
+    }
+  });
+
+  const handleBatchFolderChange = $(async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    await handleBatchImport(input.files);
+    if (input) {
+      input.value = "";
     }
   });
 
@@ -625,6 +759,15 @@ export const NoteList = component$(() => {
   });
 
   // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(({ track }) => {
+    track(() => folderInputSignal.value);
+    const input = folderInputSignal.value;
+    if (input && !input.hasAttribute("webkitdirectory")) {
+      input.setAttribute("webkitdirectory", "");
+    }
+  });
+
+  // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(({ track, cleanup }) => {
     track(() => session.ui.showSettings);
     if (!session.ui.showSettings) return;
@@ -675,6 +818,13 @@ export const NoteList = component$(() => {
           </button>
           <button
             type="button"
+            onClick$={() => folderInputSignal.value?.click()}
+            disabled={session.importState.isImporting}
+          >
+            Import folder
+          </button>
+          <button
+            type="button"
             class={{ active: session.ui.libraryMode === "shared" }}
             onClick$={handleToggleShared}
           >
@@ -714,6 +864,9 @@ export const NoteList = component$(() => {
             session.filters.query = value;
           }}
         />
+        {session.importState.lastSummary && (
+          <p class="status success">{session.importState.lastSummary}</p>
+        )}
         {session.importState.lastError && (
           <p class="status error">{session.importState.lastError}</p>
         )}
@@ -734,6 +887,14 @@ export const NoteList = component$(() => {
         class="sr-only"
         ref={fileInputSignal}
         onChange$={(event) => handleImport((event.target as HTMLInputElement).files)}
+      />
+      <input
+        type="file"
+        accept=".md,.markdown,text/markdown"
+        multiple
+        class="sr-only"
+        ref={folderInputSignal}
+        onChange$={handleBatchFolderChange}
       />
       <ul class="note-items">
         {libraryMode === "shared" && session.sharedNotesState.isLoading && (

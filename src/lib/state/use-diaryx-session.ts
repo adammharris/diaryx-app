@@ -29,6 +29,7 @@ const createInitialState = (): DiaryxSessionState => {
     importState: {
       isImporting: false,
       lastError: undefined,
+      lastSummary: undefined,
     },
     exportState: {
       isExporting: false,
