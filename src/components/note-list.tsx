@@ -1,6 +1,7 @@
 import {
   component$,
   $,
+  sync$,
   useSignal,
   useVisibleTask$,
   type QwikMouseEvent,
@@ -127,8 +128,6 @@ export const NoteList = component$(() => {
   const noteListRef = useSignal<HTMLElement>();
   const openMenuId = useSignal<string | undefined>(undefined);
   const dragNoteId = useSignal<string | undefined>(undefined);
-  const dropTargetId = useSignal<string | undefined>(undefined);
-  const dragSourceId = useSignal<string | undefined>(undefined);
   const openExportMenuId = useSignal<string | undefined>(undefined);
 
   const themeOptions: ReadonlyArray<{
@@ -981,105 +980,6 @@ export const NoteList = component$(() => {
 
   // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(({ track, cleanup }) => {
-    track(() => session.ui.libraryMode);
-    track(() => session.notes.length);
-    const root = noteListRef.value;
-    if (!root) return;
-    const list = root.querySelector<HTMLUListElement>(".note-items");
-    if (!list) return;
-
-    const getNoteId = (element: EventTarget | null): string | undefined => {
-      const node = (element as HTMLElement | null)?.closest<HTMLElement>("li[data-note-id]");
-      return node?.dataset.noteId;
-    };
-
-    const handleDragStart = (event: DragEvent) => {
-      if (session.ui.libraryMode === "shared") return;
-      const noteId = getNoteId(event.target);
-      if (!noteId) return;
-      dragNoteId.value = noteId;
-      dragSourceId.value = noteId;
-      dropTargetId.value = undefined;
-      event.dataTransfer?.setData("text/plain", noteId);
-      try {
-        event.dataTransfer?.setDragImage?.(new Image(), 0, 0);
-      } catch {
-        // ignore
-      }
-      event.dataTransfer?.effectAllowed = "move";
-    };
-
-    const handleDragEnter = (event: DragEvent) => {
-      if (session.ui.libraryMode === "shared") return;
-      const noteId = getNoteId(event.target);
-      if (!noteId || !dragNoteId.value) {
-        dropTargetId.value = undefined;
-        return;
-      }
-      if (dragNoteId.value === noteId) {
-        dropTargetId.value = undefined;
-        return;
-      }
-      event.preventDefault();
-      if (event.dataTransfer) {
-        event.dataTransfer.dropEffect = "move";
-      }
-      if (dropTargetId.value !== noteId) {
-        dropTargetId.value = noteId;
-      }
-    };
-
-    const handleDragOver = (event: DragEvent) => {
-      if (!dragNoteId.value) return;
-      if (session.ui.libraryMode === "shared") return;
-      const noteId = getNoteId(event.target);
-      if (!noteId || dragNoteId.value === noteId) {
-        event.preventDefault();
-        dropTargetId.value = undefined;
-        return;
-      }
-      event.preventDefault();
-      if (event.dataTransfer) {
-        event.dataTransfer.dropEffect = "move";
-      }
-    };
-
-    const handleDrop = (event: DragEvent) => {
-      if (session.ui.libraryMode === "shared") return;
-      event.preventDefault();
-      const parentId = getNoteId(event.target);
-      if (!parentId) return;
-      const childId = dragNoteId.value || event.dataTransfer?.getData("text/plain");
-      dragNoteId.value = undefined;
-      dropTargetId.value = undefined;
-      dragSourceId.value = undefined;
-      if (!childId || childId === parentId) return;
-      void handleMoveNote(childId, parentId);
-    };
-
-    const handleDragEnd = () => {
-      dragNoteId.value = undefined;
-      dropTargetId.value = undefined;
-      dragSourceId.value = undefined;
-    };
-
-    list.addEventListener("dragstart", handleDragStart);
-    list.addEventListener("dragenter", handleDragEnter, true);
-    list.addEventListener("dragover", handleDragOver);
-    list.addEventListener("drop", handleDrop);
-    list.addEventListener("dragend", handleDragEnd);
-
-    cleanup(() => {
-      list.removeEventListener("dragstart", handleDragStart);
-      list.removeEventListener("dragenter", handleDragEnter, true);
-      list.removeEventListener("dragover", handleDragOver);
-      list.removeEventListener("drop", handleDrop);
-      list.removeEventListener("dragend", handleDragEnd);
-    });
-  });
-
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track, cleanup }) => {
     track(() => session.ui.showSettings);
     if (!session.ui.showSettings) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1252,12 +1152,94 @@ export const NoteList = component$(() => {
                 class={{
                   active: isActive,
                   "has-children": item.hasChildren,
-                  "drop-target": dropTargetId.value === note.id,
                 }}
                 data-depth={item.depth}
                 draggable={!isSharedView}
                 data-note-id={note.id}
-                data-drag-source={dragSourceId.value === note.id ? "true" : undefined}
+                preventdefault:dragover
+                preventdefault:drop
+                onDragStart$={[
+                  sync$((event: DragEvent, currentTarget: HTMLElement) => {
+                    if (session.ui.libraryMode === "shared") return;
+                    const noteId = currentTarget.dataset.noteId;
+                    if (!noteId || !event.dataTransfer) return;
+                    event.dataTransfer.setData("text/plain", noteId);
+                    event.dataTransfer.effectAllowed = "move";
+                    currentTarget.setAttribute("data-dragging", "true");
+                  }),
+                  $((_, currentTarget: HTMLElement) => {
+                    if (session.ui.libraryMode === "shared") return;
+                    dragNoteId.value = currentTarget.dataset.noteId;
+                  })
+                ]}
+                onDragEnter$={[
+                  sync$((event: DragEvent, currentTarget: HTMLElement) => {
+                    if (session.ui.libraryMode === "shared") return;
+                    const noteId = currentTarget.dataset.noteId;
+                    const dragged = dragNoteId.value;
+                    if (!noteId || !dragged || dragged === noteId) {
+                      currentTarget.removeAttribute("data-over");
+                      return;
+                    }
+                    currentTarget.setAttribute("data-over", "true");
+                    event.preventDefault();
+                    if (event.dataTransfer) {
+                      event.dataTransfer.dropEffect = "move";
+                    }
+                  })
+                ]}
+                onDragOver$={[
+                  sync$((event: DragEvent, currentTarget: HTMLElement) => {
+                    if (session.ui.libraryMode === "shared") return;
+                    const noteId = currentTarget.dataset.noteId;
+                    const dragged = dragNoteId.value;
+                    if (!noteId || !dragged || dragged === noteId) {
+                      currentTarget.removeAttribute("data-over");
+                      return;
+                    }
+                    currentTarget.setAttribute("data-over", "true");
+                    event.preventDefault();
+                    if (event.dataTransfer) {
+                      event.dataTransfer.dropEffect = "move";
+                    }
+                  })
+                ]}
+                onDragLeave$={[
+                  sync$((event: DragEvent, currentTarget: HTMLElement) => {
+                    const related = event.relatedTarget as Node | null;
+                    if (related && currentTarget.contains(related)) return;
+                    currentTarget.removeAttribute("data-over");
+                  })
+                ]}
+                onDrop$={[
+                  sync$((event: DragEvent, currentTarget: HTMLElement) => {
+                    currentTarget.removeAttribute("data-over");
+                    currentTarget.removeAttribute("data-dragging");
+                    const noteId = currentTarget.dataset.noteId;
+                    if (!noteId || session.ui.libraryMode === "shared") return;
+                    const childId =
+                      dragNoteId.value || event.dataTransfer?.getData("text/plain");
+                    currentTarget.dataset.droppedId = childId ?? "";
+                    event.preventDefault();
+                  }),
+                  $((_, currentTarget: HTMLElement) => {
+                    const parentId = currentTarget.dataset.noteId;
+                    const childId = currentTarget.dataset.droppedId;
+                    currentTarget.removeAttribute("data-dropped-id");
+                    dragNoteId.value = undefined;
+                    if (!parentId || !childId || childId === parentId) return;
+                    void handleMoveNote(childId, parentId);
+                  })
+                ]}
+                onDragEnd$={[
+                  sync$((_, currentTarget: HTMLElement) => {
+                    currentTarget.removeAttribute("data-over");
+                    currentTarget.removeAttribute("data-dragging");
+                  }),
+                  $(() => {
+                    dragNoteId.value = undefined;
+                  })
+                ]}
               >
                 <div
                   class="note-row"
